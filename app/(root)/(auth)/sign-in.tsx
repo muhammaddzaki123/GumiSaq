@@ -69,7 +69,7 @@ export default function SignIn() {
           {/* Welcome Text */}
           <View className="mb-6">
             <Text className="text-base text-center uppercase font-rubik text-gray-600">
-              Selamat Datang Kembali di
+              Selamat Datang di
             </Text>
             <Text className="text-3xl font-rubik-bold text-gray-900 text-center mt-2">
               GumisaQ
@@ -84,7 +84,7 @@ export default function SignIn() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              className="border border-gray-300 rounded-md px-4 py-3 text-base"
+              className="border border-gray-300 rounded-md px-4 py-3 text-base mb-2"
             />
             <TextInput
               placeholder="Password"

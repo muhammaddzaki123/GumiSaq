@@ -73,7 +73,7 @@ export default function SignUp() {
               Daftar Akun Baru
             </Text>
             <Text className="text-base text-center font-rubik text-gray-600 mt-2">
-              Buat akun untuk memulai perjalanan Anda di GumisaQ.
+              Buat akun untuk memulai Belanja Anda di GumisaQ.
             </Text>
           </View>
 
@@ -83,7 +83,7 @@ export default function SignUp() {
               placeholder="Nama Lengkap"
               value={name}
               onChangeText={setName}
-              className="border border-gray-300 rounded-md px-4 py-3 text-base"
+              className="border border-gray-300 rounded-md px-4 py-3 text-base mb-2"
             />
             <TextInput
               placeholder="Email"
@@ -91,7 +91,7 @@ export default function SignUp() {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              className="border border-gray-300 rounded-md px-4 py-3 text-base"
+              className="border border-gray-300 rounded-md px-4 py-3 text-base mb-2"
             />
             <TextInput
               placeholder="Password"
