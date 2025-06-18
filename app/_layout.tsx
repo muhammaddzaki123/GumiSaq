@@ -1,10 +1,14 @@
+
+import ErrorBoundary from "@/components/ErrorBoundary";
+import GlobalProvider from "@/lib/global-provider";
 import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 import "../global.css";
-import GlobalProvider from "@/lib/global-provider";
 
 export default function RootLayout() {
+  const [isLoading, setIsLoading] = useState(true);
   const [fontsLoaded] = useFonts({
     "Rubik-Bold": require("../assets/fonts/Rubik-Bold.ttf"),
     "Rubik-ExtraBold": require("../assets/fonts/Rubik-ExtraBold.ttf"),
@@ -15,19 +19,77 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
+    const SPLASH_TIMEOUT = 5000; // 5 seconds maximum wait time
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const loadApp = async () => {
+      try {
+        await SplashScreen.preventAutoHideAsync();
+        
+        // Set a maximum timeout for the splash screen
+        const id = setTimeout(() => {
+          console.log("Splash screen timeout reached, forcing hide");
+          SplashScreen.hideAsync()
+            .catch(console.error)
+            .finally(() => setIsLoading(false));
+        }, SPLASH_TIMEOUT);
+        
+        timeoutId = id;
+
+        // Wait for fonts to load
+        if (fontsLoaded) {
+          clearTimeout(timeoutId);
+          await SplashScreen.hideAsync();
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error("Error in splash screen management:", error);
+        SplashScreen.hideAsync()
+          .catch(console.error)
+          .finally(() => setIsLoading(false));
+      }
+    };
+
+    loadApp().catch((error) => {
+      console.error("Failed to load app:", error);
+      setIsLoading(false);
+    });
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [fontsLoaded]);
 
-  if (!fontsLoaded) {
-    return null;
+  if (!fontsLoaded || isLoading) {
+    return (
+      <View style={{ 
+        flex: 1, 
+        backgroundColor: "#BFF8F8", 
+        justifyContent: 'center', 
+        alignItems: 'center' 
+      }}>
+        <ActivityIndicator 
+          size="large" 
+          color="#1CD6CE"
+          animating={true} 
+        />
+      </View>
+    );
   }
 
   return (
-    <GlobalProvider>
-      <Stack screenOptions={{ headerShown: false }} />
-    </GlobalProvider>
+    <ErrorBoundary>
+      <GlobalProvider>
+          <Stack 
+            screenOptions={{ 
+              headerShown: false,
+              animation: 'slide_from_right'
+            }} 
+          />
+      </GlobalProvider>
+    </ErrorBoundary>
   );
 }
-

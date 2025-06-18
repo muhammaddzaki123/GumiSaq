@@ -1,4 +1,4 @@
-import { Picker } from "@react-native-picker/picker";
+
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import images from "@/constants/images";
-import { loginadmin, loginUser } from "@/lib/appwrite";
+import { loginUser } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 
 export default function SignIn() {
@@ -22,8 +22,9 @@ export default function SignIn() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [userType, setUserType] = useState("user"); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Efek untuk mengarahkan pengguna yang sudah login ke halaman utama
   React.useEffect(() => {
     if (!loading && isLogged) {
       router.replace("/");
@@ -32,33 +33,30 @@ export default function SignIn() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Error", "Email dan password harus diisi");
+      Alert.alert("Error", "Email dan password harus diisi.");
       return;
     }
-    try {
-      let result = false;
-      if (userType === "user") {
-        result = await loginUser(email, password);
-      } else if (userType === "admin") {
-        const loginResult = await loginadmin(email, password);
-        result = !!loginResult;
-      }
 
-      if (result) {
-        refetch();
-      } else {
-        Alert.alert("Error", "Gagal login");
-      }
-    } catch (error) {
-      Alert.alert("Error", "Gagal login");
-      console.error("Login error:", error);
+    setIsSubmitting(true);
+
+    try {
+      await loginUser(email, password);
+      // Jika login berhasil, panggil refetch untuk memperbarui konteks global
+      await refetch();
+      // Arahkan ke halaman utama setelah login berhasil
+      router.replace("/");
+      
+    } catch (error: any) {
+      Alert.alert("Error Login", error.message || "Terjadi kesalahan saat mencoba masuk.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 px-6 py-6">
+        <View className="flex-1 px-6 py-6 justify-center">
           {/* Logo */}
           <View className="items-center mb-8">
             <Image
@@ -71,16 +69,15 @@ export default function SignIn() {
           {/* Welcome Text */}
           <View className="mb-6">
             <Text className="text-base text-center uppercase font-rubik text-gray-600">
-              Selamat datang Di
+              Selamat Datang Kembali di
             </Text>
-
             <Text className="text-3xl font-rubik-bold text-gray-900 text-center mt-2">
-              GumisaQ{"\n"}
+              GumisaQ
             </Text>
           </View>
 
           {/* Login Form */}
-          <View className="space-y-2 ">
+          <View className="space-y-4">
             <TextInput
               placeholder="Email"
               value={email}
@@ -94,27 +91,31 @@ export default function SignIn() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              className="border border-gray-300 rounded-md px-4 py-3 text-base mt-3"
+              className="border border-gray-300 rounded-md px-4 py-3 text-base"
             />
-            <View className="border border-gray-300 rounded-md px-4 py-3 mt-3">
-              <Picker
-                selectedValue={userType}
-                onValueChange={(itemValue: string) => setUserType(itemValue)}
-              >
-                <Picker.Item label="User" value="user" />
-                <Picker.Item label="Admin" value="admin" />
-              </Picker>
-            </View>
             <TouchableOpacity
               onPress={handleLogin}
-              className="bg-primary-100 rounded-full py-4 items-center mt-3"
+              disabled={isSubmitting}
+              className={`rounded-full py-4 items-center mt-6 ${isSubmitting ? 'bg-primary-100/50' : 'bg-primary-100'}`}
             >
-              <Text className="text-white text-lg font-rubik-medium mt-3">
-                Login
+              <Text className="text-white text-lg font-rubik-medium">
+                {isSubmitting ? 'Masuk...' : 'Masuk'}
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Link to Sign Up */}
+          <View className="flex-row justify-center mt-6">
+            <Text className="text-base text-gray-600 font-rubik">
+              Belum punya akun?{' '}
+            </Text>
+            <TouchableOpacity onPress={() => router.push('/sign-up')}>
+              <Text className="text-base text-primary-300 font-rubik-bold">
+                Daftar
+              </Text>
+            </TouchableOpacity>
           </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

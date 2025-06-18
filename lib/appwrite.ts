@@ -3,10 +3,12 @@ import {
   Avatars,
   Client,
   Databases,
+  ID,
   Query,
-  Storage
+  Storage,
 } from "react-native-appwrite";
 
+// KONFIGURASI DIpertahankan SESUAI ASLINYA
 export const config = {
   platform: "com.saqcloth.gumisaq",
   endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
@@ -14,162 +16,135 @@ export const config = {
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
 
   //artikel
-  artikelCollectionId:process.env.EXPO_PUBLIC_APPWRITE_ARTIKEL_COLLECTION_ID,
+  artikelCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ARTIKEL_COLLECTION_ID,
 
   //users
   usersProfileCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_PROFILE_COLLECTION_ID,
 
   //marketplace
-  galleriesCollectionId:process.env.EXPO_PUBLIC_APPWRITE_GALLERIES_COLLECTION_ID,
+  galleriesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_GALLERIES_COLLECTION_ID,
   reviewsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_REVIEWS_COLLECTION_ID,
   agentsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AGENTS_COLLECTION_ID,
-  stokCollectionId:process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID,
+  stokCollectionId: process.env.EXPO_PUBLIC_APPWRITE_STOK_COLLECTION_ID,
   storageBucketId: process.env.EXPO_PUBLIC_APPWRITE_STORAGE_BUCKET_ID || 'default',
 };
 
-export const client = new Client();
+// Inisialisasi Klien Appwrite
+const client = new Client();
 client
   .setEndpoint(config.endpoint!)
   .setProject(config.projectId!)
   .setPlatform(config.platform!);
 
-export const avatar = new Avatars(client);
+export const avatars = new Avatars(client);
 export const account = new Account(client);
 export const databases = new Databases(client);
 export const storage = new Storage(client);
 
-// Simpan data user yang sedang login
-let currentUser: any = null;
+// =================================================================
+// FUNGSI OTENTIKASI & PENGGUNA (Authentication & User)
+// =================================================================
 
-export async function getCurrentUser() {
+/**
+ * Membuat pengguna baru menggunakan sistem otentikasi aman Appwrite
+ * dan menyimpan profilnya di Database.
+ */
+export async function createUser(email: string, password: string, name: string) {
   try {
-    if (currentUser) {
-      console.log("Returning current user:", currentUser);
-      return currentUser;
-    }
-    console.log("No current user found");
-    return null;
-  } catch (error) {
-    console.log("Error getting current user:", error);
-    return null;
-  }
-}
+    // 1. Buat akun di sistem otentikasi Appwrite
+    const newAccount = await account.create(ID.unique(), email, password, name);
+    if (!newAccount) throw new Error("Gagal membuat akun.");
 
-export async function loginUser(email: string, password: string) {
-  try {
-    console.log("Mencoba login dengan email:", email);
-    
-    const users = await databases.listDocuments(
+    // 2. Buat avatar default dari inisial nama
+    const avatarUrl = avatars.getInitials(name);
+
+    // 3. Simpan data profil user ke koleksi 'users'
+    //    dengan menyertakan userType
+    await databases.createDocument(
       config.databaseId!,
       config.usersProfileCollectionId!,
-      [Query.equal("email", email)]
+      newAccount.$id,
+      {
+        accountId: newAccount.$id,
+        email,
+        name,
+        avatar: avatarUrl.toString(),
+        userType: 'user', // <-- userType DITAMBAHKAN DI SINI
+      }
     );
 
-    console.log("Query result:", {
-      totalUsers: users.documents.length,
-      firstUser: users.documents[0] ? {
-        email: users.documents[0].email,
-        hasPassword: !!users.documents[0].password,
-        currentUserType: users.documents[0].userType
-      } : null
-    });
-
-    if (users.documents.length === 1) {
-      const user = users.documents[0];
-      
-      const inputPass = String(password).trim();
-      const storedPass = user.password ? String(user.password).trim() : '';
-      console.log("Password comparison:", {
-        inputLength: inputPass.length,
-        storedLength: storedPass.length,
-        isMatch: inputPass === storedPass
-      });
-
-      if (storedPass && inputPass === storedPass) {
-        console.log("Login berhasil untuk user:", user.email);
-
-        try {
-          if (user.userType !== "user") {
-            await databases.updateDocument(
-              config.databaseId!,
-              config.usersProfileCollectionId!,
-              user.$id,
-              {
-                userType: "user",
-                lastSeen: new Date().toISOString()
-              }
-            );
-          }
-
-          // Simpan data user yang login
-          currentUser = {
-            $id: user.$id,
-            name: user.name || email.split('@')[0],
-            email: user.email,
-            avatar: avatar.getInitials(user.name || email.split('@')[0]).toString(),
-            userType: "user"
-          };
-
-          console.log("Current user set to:", currentUser);
-        } catch (updateError) {
-          console.error("Gagal update user type:", updateError);
-        }
-
-        return true;
-      } else {
-        console.log("Password tidak cocok");
-        throw new Error("Email atau password salah");
-      }
-    } else {
-      console.log("User tidak ditemukan");
-      throw new Error("Email atau password salah");
-    }
-  } catch (error) {
-    console.error("Login user error:", error);
-    return false;
+    return newAccount;
+  } catch (error: any) {
+    console.error("Error creating user:", error);
+    throw new Error(error.message || "Gagal membuat akun.");
   }
 }
 
+/**
+ * Login pengguna menggunakan sesi aman Appwrite.
+ * Dibuat defensif dengan mencoba menghapus sesi lama terlebih dahulu.
+ */
+export async function loginUser(email: string, password: string) {
+  try {
+    // Coba hapus sesi yang mungkin tertinggal terlebih dahulu.
+    await account.deleteSession("current").catch(() => {});
+
+    // Setelah memastikan tidak ada sesi aktif, buat sesi baru.
+    const newSession = await account.createEmailPasswordSession(email, password);
+    return newSession;
+
+  } catch (error: any) {
+    console.error("Error during login process:", error);
+    throw new Error(error.message || "Email atau password salah.");
+  }
+}
+
+/**
+ * Mengambil data pengguna yang sedang login berdasarkan sesi aktif.
+ */
+export async function getCurrentUser() {
+  try {
+    const currentAccount = await account.get();
+    if (!currentAccount) return null;
+
+    const userProfile = await databases.getDocument(
+      config.databaseId!,
+      config.usersProfileCollectionId!,
+      currentAccount.$id
+    );
+    if (!userProfile) return null;
+
+    return userProfile;
+  } catch (error) {
+    console.log("No active session or user profile found:", error);
+    return null;
+  }
+}
+
+/**
+ * Logout pengguna dengan menghapus sesi saat ini.
+ */
 export async function logout() {
   try {
-    currentUser = null;
-    console.log("User logged out, currentUser cleared");
-    return true;
-  } catch (error) {
-    console.error(error);
-    return false;
+    return await account.deleteSession("current");
+  } catch (error: any) {
+    console.error("Error logging out:", error.message);
+    throw new Error("Gagal untuk logout.");
   }
 }
 
-//artikel
+// =================================================================
+// FUNGSI ARTIKEL
+// =================================================================
+
 export async function getArticles() {
   try {
     const result = await databases.listDocuments(
       config.databaseId!,
       config.artikelCollectionId!,
-      [
-        Query.equal("isPublished", true),
-        Query.orderDesc("$createdAt")
-      ]
+      [Query.equal("isPublished", true), Query.orderDesc("$createdAt")]
     );
-    
-    // Transform the response to match our Article interface
-    const articles = result.documents.map(doc => ({
-      $id: doc.$id,
-      $createdAt: doc.$createdAt,
-      $updatedAt: doc.$updatedAt,
-      title: doc.title,
-      description: doc.description,
-      content: doc.content,
-      image: doc.image,
-      category: doc.category,
-      author: doc.author,
-      tags: doc.tags || [],
-      isPublished: doc.isPublished,
-      viewCount: doc.viewCount || 0
-    }));
-
-    return articles;
+    return result.documents;
   } catch (error) {
     console.error('Error fetching articles:', error);
     return [];
@@ -177,118 +152,114 @@ export async function getArticles() {
 }
 
 export async function getArticleById(id: string) {
-  try {
-    const doc = await databases.getDocument(
-      config.databaseId!,
-      config.artikelCollectionId!,
-      id
-    );
-
-    // Transform the response to match our Article interface
-    const article = {
-      $id: doc.$id,
-      $createdAt: doc.$createdAt,
-      $updatedAt: doc.$updatedAt,
-      title: doc.title,
-      description: doc.description,
-      content: doc.content,
-      image: doc.image,
-      category: doc.category,
-      author: doc.author,
-      tags: doc.tags || [],
-      isPublished: doc.isPublished,
-      viewCount: doc.viewCount || 0
-    };
-
-    // Update view count
-    if (doc.isPublished) {
-      await databases.updateDocument(
-        config.databaseId!,
-        config.artikelCollectionId!,
-        id,
-        {
-          viewCount: (doc.viewCount || 0) + 1
+    try {
+        const doc = await databases.getDocument(
+          config.databaseId!,
+          config.artikelCollectionId!,
+          id
+        );
+    
+        if (doc.isPublished) {
+          // Fire and forget, tidak perlu menunggu update selesai
+          databases.updateDocument(
+            config.databaseId!,
+            config.artikelCollectionId!,
+            id,
+            { viewCount: (doc.viewCount || 0) + 1 }
+          );
         }
-      );
-    }
-
-    return article;
-  } catch (error) {
-    console.error('Error fetching article:', error);
-    return null;
-  }
+    
+        return doc;
+      } catch (error) {
+        console.error('Error fetching article:', error);
+        return null;
+      }
 }
-//artikel last
 
-//get properti atau stok barang 
+// =================================================================
+// FUNGSI STOK BARANG (PRODUK)
+// =================================================================
+
+/**
+ * Mengambil stok/produk terbaru.
+ */
 export async function getLatestProperties() {
   try {
     const result = await databases.listDocuments(
       config.databaseId!,
       config.stokCollectionId!,
-      [Query.orderAsc("$createdAt"), Query.limit(5)]
+      [Query.orderDesc("$createdAt"), Query.limit(5)]
     );
-
     return result.documents;
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching latest properties:", error);
     return [];
   }
 }
 
-//properti
-
-export async function getProperties({
-  filter,
-  query,
-  limit,
-}: {
-  filter: string;
-  query: string;
-  limit?: number;
-}) {
+/**
+ * Mengambil semua stok/produk dengan filter dan query.
+ */
+export async function getProperties({ filter, query, limit }: { filter?: string; query?: string; limit?: number; }) {
   try {
-    const buildQuery = [Query.orderDesc("$createdAt")];
+    const queries: any[] = [Query.orderDesc("$createdAt")];
 
-    if (filter && filter !== "All")
-      buildQuery.push(Query.equal("type", filter));
-
-    if (query)
-      buildQuery.push(
-        Query.or([
-          Query.search("name", query),
-          Query.search("address", query),
-          Query.search("type", query),
-        ])
-      );
-
-    if (limit) buildQuery.push(Query.limit(limit));
+    if (filter && filter !== "All") queries.push(Query.equal("type", filter));
+    if (query) queries.push(Query.search("name", query));
+    if (limit) queries.push(Query.limit(limit));
 
     const result = await databases.listDocuments(
       config.databaseId!,
       config.stokCollectionId!,
-      buildQuery
+      queries
     );
-
     return result.documents;
   } catch (error) {
-    console.error(error);
+    console.error("Error fetching properties:", error);
     return [];
   }
 }
 
-// write function to get property by id
+/**
+ * Mengambil detail stok/produk berdasarkan ID, beserta data relasinya.
+ */
 export async function getPropertyById({ id }: { id: string }) {
   try {
-    const result = await databases.getDocument(
+    const propertyDoc = await databases.getDocument(
       config.databaseId!,
       config.stokCollectionId!,
       id
     );
-    return result;
+    if (!propertyDoc) throw new Error("Produk tidak ditemukan.");
+
+    // Mengambil data lengkap 'agent' (penjual)
+    if (propertyDoc.agent?.$id) {
+      propertyDoc.agent = await databases.getDocument(
+        config.databaseId!,
+        config.agentsCollectionId!,
+        propertyDoc.agent.$id
+      );
+    }
+    
+    // Mengambil data lengkap 'reviews'
+    if (propertyDoc.reviews?.length > 0) {
+      const reviewPromises = propertyDoc.reviews.map((review: any) =>
+        databases.getDocument(config.databaseId!, config.reviewsCollectionId!, review.$id)
+      );
+      propertyDoc.reviews = await Promise.all(reviewPromises);
+    }
+
+    // Mengambil data lengkap 'gallery'
+    if (propertyDoc.gallery?.length > 0) {
+        const galleryPromises = propertyDoc.gallery.map((image: any) =>
+          databases.getDocument(config.databaseId!, config.galleriesCollectionId!, image.$id)
+        );
+        propertyDoc.gallery = await Promise.all(galleryPromises);
+    }
+
+    return propertyDoc;
   } catch (error) {
-    console.error(error);
+    console.error("Error getting property by ID:", error);
     return null;
   }
 }
-
