@@ -12,14 +12,18 @@ export const config = {
   endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
   projectId: process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID,
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
+
+  //artikel
   artikelCollectionId:process.env.EXPO_PUBLIC_APPWRITE_ARTIKEL_COLLECTION_ID,
-  foodRecallCollectionId: process.env.EXPO_PUBLIC_APPWRITE_FOOD_RECALL_COLLECTION_ID,
+
+  //users
   usersProfileCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_PROFILE_COLLECTION_ID,
-  ahligiziCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AHLIGIZI_COLLECTION_ID,
-  chatMessagesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_CHAT_MESSAGES_COLLECTION_ID,
-  adminChatCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ADMIN_CHAT_COLLECTION_ID,
-  propertiesCollectionId:
-  process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID,
+
+  //marketplace
+  galleriesCollectionId:process.env.EXPO_PUBLIC_APPWRITE_GALLERIES_COLLECTION_ID,
+  reviewsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_REVIEWS_COLLECTION_ID,
+  agentsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AGENTS_COLLECTION_ID,
+  stokCollectionId:process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID,
   storageBucketId: process.env.EXPO_PUBLIC_APPWRITE_STORAGE_BUCKET_ID || 'default',
 };
 
@@ -126,94 +130,6 @@ export async function loginUser(email: string, password: string) {
   }
 }
 
-export async function loginadmin(email: string, password: string) {
-  try {
-    console.log("Mencoba login admin gizi dengan email:", email);
-
-    const admins = await databases.listDocuments(
-      config.databaseId!,
-      config.ahligiziCollectionId!,
-      [Query.equal("email", email)]
-    );
-
-    console.log("Query result ahli gizi:", {
-      totalFound: admins.documents.length,
-      firstadmin: admins.documents[0] ? {
-        email: admins.documents[0].email,
-        hasPassword: !!admins.documents[0].password,
-        currentUserType: admins.documents[0].userType
-      } : null
-    });
-
-    if (admins.documents.length === 1) {
-      const admin = admins.documents[0];
-      
-      const inputPass = String(password).trim();
-      const storedPass = admin.password ? String(admin.password).trim() : '';
-      console.log("Password comparison admin:", {
-        inputLength: inputPass.length,
-        storedLength: storedPass.length,
-        isMatch: inputPass === storedPass
-      });
-
-      if (storedPass && inputPass === storedPass) {
-        console.log("Login berhasil untuk ahli gizi:", admin.email);
-        
-        const updateData: any = {
-          status: "online",
-          lastSeen: new Date().toISOString()
-        };
-
-        if (admin.userType !== "admin") {
-          updateData.userType = "admin";
-        }
-
-        try {
-          await databases.updateDocument(
-            config.databaseId!,
-            config.ahligiziCollectionId!,
-            admin.$id,
-            updateData
-          );
-
-          // Simpan data admin yang login
-          currentUser = {
-            $id: admin.$id,
-            name: admin.name || email.split('@')[0],
-            email: admin.email,
-            avatar: avatar.getInitials(admin.name || email.split('@')[0]).toString(),
-            userType: "admin",
-            specialization: admin.specialization,
-            status: "online"
-          };
-
-          console.log("Current user (admin) set to:", currentUser);
-        } catch (updateError) {
-          console.error("Gagal update status:", updateError);
-        }
-
-        return {
-          admin: {
-            ...admin,
-            userType: "admin",
-            status: "online",
-            lastSeen: new Date().toISOString()
-          }
-        };
-      } else {
-        console.log("Password tidak cocok untuk ahli gizi");
-        throw new Error("Email atau password salah");
-      }
-    } else {
-      console.log("Ahli gizi tidak ditemukan dengan email:", email);
-      throw new Error("Email atau password salah");
-    }
-  } catch (error) {
-    console.error("Login ahli gizi error:", error);
-    return false;
-  }
-}
-
 export async function logout() {
   try {
     currentUser = null;
@@ -222,26 +138,6 @@ export async function logout() {
   } catch (error) {
     console.error(error);
     return false;
-  }
-}
-
-export async function logoutadmin(adminId: string) {
-  try {
-    await databases.updateDocument(
-      config.databaseId!,
-      config.ahligiziCollectionId!,
-      adminId,
-      {
-        status: 'offline',
-        lastSeen: new Date().toISOString()
-      }
-    );
-    currentUser = null;
-    console.log("admin logged out, currentUser cleared");
-    return true;
-  } catch (error) {
-    console.error('Logout error:', error);
-    throw error;
   }
 }
 
@@ -329,7 +225,7 @@ export async function getLatestProperties() {
   try {
     const result = await databases.listDocuments(
       config.databaseId!,
-      config.propertiesCollectionId!,
+      config.stokCollectionId!,
       [Query.orderAsc("$createdAt"), Query.limit(5)]
     );
 
@@ -339,6 +235,8 @@ export async function getLatestProperties() {
     return [];
   }
 }
+
+//properti
 
 export async function getProperties({
   filter,
@@ -368,7 +266,7 @@ export async function getProperties({
 
     const result = await databases.listDocuments(
       config.databaseId!,
-      config.propertiesCollectionId!,
+      config.stokCollectionId!,
       buildQuery
     );
 
@@ -384,7 +282,7 @@ export async function getPropertyById({ id }: { id: string }) {
   try {
     const result = await databases.getDocument(
       config.databaseId!,
-      config.propertiesCollectionId!,
+      config.stokCollectionId!,
       id
     );
     return result;
