@@ -18,8 +18,10 @@ export const config = {
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
   storageBucketId: process.env.EXPO_PUBLIC_APPWRITE_STORAGE_BUCKET_ID || 'default',
 
-  // Collections IDs
+  // artikel
   artikelCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ARTIKEL_COLLECTION_ID,
+
+  //toko
   usersProfileCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_PROFILE_COLLECTION_ID,
   galleriesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_GALLERIES_COLLECTION_ID,
   reviewsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_REVIEWS_COLLECTION_ID,
@@ -358,4 +360,45 @@ export async function createOrder(
         console.error("Error saat membuat pesanan:", error);
         throw new Error(error.message || "Gagal membuat pesanan.");
     }
+}
+
+// =================================================================
+// FUNGSI AGEN
+// =================================================================
+
+/**
+ * Mendaftarkan user sebagai agen baru.
+ */
+export async function registerAsAgent(userId: string, agentData: { storeName: string; phoneNumber: string; }) {
+  try {
+    // 1. Buat dokumen baru di collection 'agents'
+    await databases.createDocument(
+      config.databaseId!,
+      config.agentsCollectionId!,
+      userId, // Gunakan ID user sebagai ID dokumen agen untuk relasi 1-to-1
+      {
+        name: agentData.storeName,
+        phone: agentData.phoneNumber,
+        owner: userId, // Relasi ke dokumen user
+      }
+    );
+
+    // 2. Update userType di collection 'users' menjadi 'agent'
+    await databases.updateDocument(
+      config.databaseId!,
+      config.usersProfileCollectionId!,
+      userId,
+      {
+        userType: 'agent'
+      }
+    );
+
+  } catch (error: any) {
+    console.error("Error saat mendaftar sebagai agen:", error);
+    // Cek jika error karena agen sudah ada
+    if (error.code === 409) { // 409 Conflict (Document already exists)
+      throw new Error("Anda sudah terdaftar sebagai agen.");
+    }
+    throw new Error(error.message || "Gagal mendaftar sebagai agen.");
+  }
 }
