@@ -18,7 +18,7 @@ export const config = {
   databaseId: process.env.EXPO_PUBLIC_APPWRITE_DATABASE_ID,
   storageBucketId: process.env.EXPO_PUBLIC_APPWRITE_STORAGE_BUCKET_ID || 'default',
 
-  // Collections
+  // Collections IDs
   artikelCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ARTIKEL_COLLECTION_ID,
   usersProfileCollectionId: process.env.EXPO_PUBLIC_APPWRITE_USERS_PROFILE_COLLECTION_ID,
   galleriesCollectionId: process.env.EXPO_PUBLIC_APPWRITE_GALLERIES_COLLECTION_ID,
@@ -32,10 +32,14 @@ export const config = {
 
 // Inisialisasi Klien Appwrite
 const client = new Client();
-client
-  .setEndpoint(config.endpoint!)
-  .setProject(config.projectId!)
-  .setPlatform(config.platform!);
+if (config.endpoint && config.projectId && config.platform) {
+    client
+      .setEndpoint(config.endpoint)
+      .setProject(config.projectId)
+      .setPlatform(config.platform);
+} else {
+    console.error("Konfigurasi Appwrite tidak lengkap. Silakan periksa variabel lingkungan Anda.");
+}
 
 export const avatars = new Avatars(client);
 export const account = new Account(client);
@@ -56,6 +60,7 @@ export async function createUser(email: string, password: string, name: string) 
 
     const avatarUrl = avatars.getInitials(name);
 
+    // Saat membuat user, inisialisasi 'addresses' dengan array kosong
     await databases.createDocument(
       config.databaseId!,
       config.usersProfileCollectionId!,
@@ -66,13 +71,13 @@ export async function createUser(email: string, password: string, name: string) 
         name,
         avatar: avatarUrl.toString(),
         userType: 'user',
-        addresses: [],
+        addresses: [], // Inisialisasi 'addresses' sebagai array kosong
       }
     );
 
     return newAccount;
   } catch (error: any) {
-    console.error("Error creating user:", error);
+    console.error("Error saat membuat pengguna:", error);
     throw new Error(error.message || "Gagal membuat akun.");
   }
 }
@@ -82,11 +87,11 @@ export async function createUser(email: string, password: string, name: string) 
  */
 export async function loginUser(email: string, password: string) {
   try {
+    // Menghapus sesi lama untuk memastikan login yang bersih
     await account.deleteSession("current").catch(() => {});
-    const newSession = await account.createEmailPasswordSession(email, password);
-    return newSession;
+    return await account.createEmailPasswordSession(email, password);
   } catch (error: any) {
-    console.error("Error during login process:", error);
+    console.error("Error saat proses login:", error);
     throw new Error(error.message || "Email atau password salah.");
   }
 }
@@ -99,16 +104,13 @@ export async function getCurrentUser() {
     const currentAccount = await account.get();
     if (!currentAccount) return null;
 
-    const userProfile = await databases.getDocument(
+    return await databases.getDocument(
       config.databaseId!,
       config.usersProfileCollectionId!,
       currentAccount.$id
     );
-    if (!userProfile) return null;
-
-    return userProfile;
   } catch (error) {
-    console.log("No active session or user profile found.");
+    console.log("Tidak ada sesi aktif atau profil pengguna tidak ditemukan.");
     return null;
   }
 }
@@ -120,7 +122,7 @@ export async function logout() {
   try {
     return await account.deleteSession("current");
   } catch (error: any) {
-    console.error("Error logging out:", error.message);
+    console.error("Error saat logout:", error.message);
     throw new Error("Gagal untuk logout.");
   }
 }
@@ -138,12 +140,10 @@ export async function getArticles() {
     );
     return result.documents;
   } catch (error) {
-    console.error('Error fetching articles:', error);
+    console.error('Error saat mengambil artikel:', error);
     return [];
   }
 }
-
-// ... (Fungsi getArticleById bisa ditambahkan kembali jika perlu)
 
 // =================================================================
 // FUNGSI PRODUK (PROPERTIES)
@@ -158,7 +158,7 @@ export async function getLatestProperties() {
     );
     return result.documents;
   } catch (error) {
-    console.error("Error fetching latest properties:", error);
+    console.error("Error saat mengambil produk terbaru:", error);
     return [];
   }
 }
@@ -166,57 +166,37 @@ export async function getLatestProperties() {
 export async function getProperties({ filter, query, limit }: { filter?: string; query?: string; limit?: number; }) {
   try {
     const queries: any[] = [Query.orderDesc("$createdAt")];
-
     if (filter && filter !== "All") queries.push(Query.equal("type", filter));
     if (query) queries.push(Query.search("name", query));
     if (limit) queries.push(Query.limit(limit));
-
-    const result = await databases.listDocuments(
-      config.databaseId!,
-      config.stokCollectionId!,
-      queries
-    );
-    return result.documents;
+    return (await databases.listDocuments(config.databaseId!, config.stokCollectionId!, queries)).documents;
   } catch (error) {
-    console.error("Error fetching properties:", error);
+    console.error("Error saat mengambil produk:", error);
     return [];
   }
 }
 
 export async function getPropertyById({ id }: { id: string }) {
   try {
-    const propertyDoc = await databases.getDocument(
-      config.databaseId!,
-      config.stokCollectionId!,
-      id
-    );
-    if (!propertyDoc) throw new Error("Produk tidak ditemukan.");
+    const propertyDoc = await databases.getDocument(config.databaseId!, config.stokCollectionId!, id);
+    if (!propertyDoc) return null;
 
     if (propertyDoc.agent?.$id) {
-      propertyDoc.agent = await databases.getDocument(
-        config.databaseId!,
-        config.agentsCollectionId!,
-        propertyDoc.agent.$id
-      );
+      propertyDoc.agent = await databases.getDocument(config.databaseId!, config.agentsCollectionId!, propertyDoc.agent.$id);
     }
-    
-    if (propertyDoc.reviews?.length > 0) {
-      const reviewPromises = propertyDoc.reviews.map((review: any) =>
+    if (Array.isArray(propertyDoc.reviews) && propertyDoc.reviews.length > 0) {
+      propertyDoc.reviews = await Promise.all(propertyDoc.reviews.map((review: any) =>
         databases.getDocument(config.databaseId!, config.reviewsCollectionId!, review.$id)
-      );
-      propertyDoc.reviews = await Promise.all(reviewPromises);
+      ));
     }
-
-    if (propertyDoc.gallery?.length > 0) {
-        const galleryPromises = propertyDoc.gallery.map((image: any) =>
-          databases.getDocument(config.databaseId!, config.galleriesCollectionId!, image.$id)
-        );
-        propertyDoc.gallery = await Promise.all(galleryPromises);
+    if (Array.isArray(propertyDoc.gallery) && propertyDoc.gallery.length > 0) {
+      propertyDoc.gallery = await Promise.all(propertyDoc.gallery.map((image: any) =>
+        databases.getDocument(config.databaseId!, config.galleriesCollectionId!, image.$id)
+      ));
     }
-
     return propertyDoc;
   } catch (error) {
-    console.error("Error getting property by ID:", error);
+    console.error(`Error saat mengambil produk berdasarkan ID (${id}):`, error);
     return null;
   }
 }
@@ -225,26 +205,21 @@ export async function getPropertyById({ id }: { id: string }) {
 // FUNGSI KERANJANG BELANJA (CART)
 // =================================================================
 
-/**
- * Menambahkan produk ke keranjang pengguna.
- * Jika produk sudah ada, akan menambah quantity-nya.
- */
 export async function addToCart(userId: string, productId: string) {
   try {
-    const existingCartItem = await databases.listDocuments(
+    const existingItems = await databases.listDocuments(
       config.databaseId!,
       config.keranjangCollectionId!,
-      [Query.equal("userId", userId), Query.equal("productId", productId)]
+      [Query.equal("userId", userId), Query.equal("productId", productId), Query.limit(1)]
     );
 
-    if (existingCartItem.documents.length > 0) {
-      const item = existingCartItem.documents[0];
-      const newQuantity = item.quantity + 1;
+    if (existingItems.documents.length > 0) {
+      const item = existingItems.documents[0];
       return await databases.updateDocument(
         config.databaseId!,
         config.keranjangCollectionId!,
         item.$id,
-        { quantity: newQuantity }
+        { quantity: item.quantity + 1 }
       );
     } else {
       return await databases.createDocument(
@@ -255,83 +230,23 @@ export async function addToCart(userId: string, productId: string) {
       );
     }
   } catch (error: any) {
-    console.error("Error adding to cart:", error);
+    console.error("Error saat menambah ke keranjang:", error);
     throw new Error(error.message || "Gagal menambahkan ke keranjang.");
   }
 }
 
-/**
- * Mengambil semua item di keranjang milik seorang pengguna.
- */
 export async function getCartItems(userId: string) {
   try {
     const result = await databases.listDocuments(
       config.databaseId!,
       config.keranjangCollectionId!,
-      [Query.equal("userId", userId)]
+      [Query.equal("userId", userId), Query.orderDesc("$createdAt")]
     );
     return result.documents;
   } catch (error) {
-    console.error('Error fetching cart items:', error);
+    console.error('Error saat mengambil item keranjang:', error);
     return [];
   }
-}
-
-// =================================================================
-// FUNGSI PESANAN (ORDERS)
-// =================================================================
-
-/**
- * Membuat pesanan baru dan membersihkan keranjang.
- */
-export async function createOrder(
-    userId: string, 
-    shippingAddress: string, 
-    totalAmount: number,
-    cartItems: any[]
-) {
-    if (!cartItems || cartItems.length === 0) {
-        throw new Error("Keranjang kosong, tidak bisa membuat pesanan.");
-    }
-
-    try {
-        // 1. Buat dokumen pesanan utama
-        const newOrder = await databases.createDocument(
-            config.databaseId!,
-            config.ordersCollectionId!,
-            ID.unique(),
-            { userId, shippingAddress, totalAmount, status: 'pending' }
-        );
-
-        if (!newOrder) throw new Error("Gagal membuat data pesanan.");
-
-        // 2. Simpan setiap item keranjang ke dalam 'order_items'
-        for (const item of cartItems) {
-            await databases.createDocument(
-                config.databaseId!,
-                config.orderItemsCollectionId!,
-                ID.unique(),
-                {
-                    orderId: newOrder.$id,
-                    productId: item.productId,
-                    quantity: item.quantity,
-                    priceAtPurchase: item.product?.price || 0
-                }
-            );
-        }
-
-        // 3. Bersihkan keranjang belanja pengguna setelah pesanan dibuat
-        for (const item of cartItems) {
-            await databases.deleteDocument(config.databaseId!, config.keranjangCollectionId!, item.$id);
-        }
-
-        // Kembalikan ID pesanan baru untuk halaman konfirmasi
-        return newOrder.$id;
-
-    } catch (error: any) {
-        console.error("Error creating order:", error);
-        throw new Error(error.message || "Gagal membuat pesanan.");
-    }
 }
 
 // =================================================================
@@ -339,17 +254,16 @@ export async function createOrder(
 // =================================================================
 
 /**
- * Mengambil daftar alamat pengguna.
+ * Mengambil daftar alamat pengguna dan mengubahnya dari string JSON menjadi objek.
  */
-export async function getUserAddresses(userId: string): Promise<any[]> {
+export async function getUserAddresses(userId: string): Promise<Array<{ label: string, detail: string }>> {
     try {
-        const userDoc = await databases.getDocument(
-            config.databaseId!,
-            config.usersProfileCollectionId!,
-            userId
-        );
-        // addresses disimpan sebagai string JSON, jadi kita perlu parse
-        return userDoc.addresses ? JSON.parse(userDoc.addresses) : [];
+        const userDoc = await databases.getDocument(config.databaseId!, config.usersProfileCollectionId!, userId);
+        if (userDoc.addresses && Array.isArray(userDoc.addresses)) {
+          // Parse setiap string JSON di dalam array menjadi objek
+          return userDoc.addresses.map((addrStr: string) => JSON.parse(addrStr));
+        }
+        return [];
     } catch (error) {
         console.error("Gagal mengambil alamat:", error);
         return [];
@@ -357,20 +271,18 @@ export async function getUserAddresses(userId: string): Promise<any[]> {
 }
 
 /**
- * Menambahkan alamat baru untuk pengguna.
+ * Menambahkan alamat baru untuk pengguna dengan mengubah objek menjadi string JSON.
  */
 export async function addUserAddress(userId: string, newAddress: { label: string, detail: string }) {
     try {
-        const currentAddresses = await getUserAddresses(userId);
-        const updatedAddresses = [...currentAddresses, newAddress];
+        const userDoc = await databases.getDocument(config.databaseId!, config.usersProfileCollectionId!, userId);
+        const currentAddresses = userDoc.addresses || [];
         
-        await databases.updateDocument(
-            config.databaseId!,
-            config.usersProfileCollectionId!,
-            userId,
-            { addresses: JSON.stringify(updatedAddresses) } // Simpan kembali sebagai string JSON
-        );
-        return updatedAddresses;
+        // Ubah objek alamat baru menjadi string sebelum menambahkannya ke array
+        const updatedAddresses = [...currentAddresses, JSON.stringify(newAddress)];
+        
+        await databases.updateDocument(config.databaseId!, config.usersProfileCollectionId!, userId, { addresses: updatedAddresses });
+        return updatedAddresses.map((addr: string) => JSON.parse(addr));
     } catch (error: any) {
         console.error("Gagal menambah alamat:", error);
         throw new Error(error.message);
@@ -382,20 +294,68 @@ export async function addUserAddress(userId: string, newAddress: { label: string
  */
 export async function deleteUserAddress(userId: string, addressToDelete: { label: string, detail: string }) {
     try {
-        const currentAddresses = await getUserAddresses(userId);
+        const userDoc = await databases.getDocument(config.databaseId!, config.usersProfileCollectionId!, userId);
+        const currentAddresses = userDoc.addresses || [];
+
+        // Ubah objek yang akan dihapus menjadi string untuk perbandingan
+        const addressToDeleteString = JSON.stringify(addressToDelete);
         const updatedAddresses = currentAddresses.filter(
-            addr => addr.label !== addressToDelete.label || addr.detail !== addressToDelete.detail
+            (addrStr: string) => addrStr !== addressToDeleteString
         );
 
-        await databases.updateDocument(
-            config.databaseId!,
-            config.usersProfileCollectionId!,
-            userId,
-            { addresses: JSON.stringify(updatedAddresses) }
-        );
-        return updatedAddresses;
+        await databases.updateDocument(config.databaseId!, config.usersProfileCollectionId!, userId, { addresses: updatedAddresses });
+        return updatedAddresses.map((addr: string) => JSON.parse(addr));
     } catch (error: any) {
         console.error("Gagal menghapus alamat:", error);
         throw new Error(error.message);
+    }
+}
+
+// =================================================================
+// FUNGSI PESANAN (ORDERS)
+// =================================================================
+
+export async function createOrder(
+    userId: string, 
+    shippingAddress: string, 
+    totalAmount: number,
+    cartItems: any[]
+) {
+    if (!cartItems || cartItems.length === 0) {
+        throw new Error("Keranjang kosong, tidak bisa membuat pesanan.");
+    }
+
+    try {
+        const newOrder = await databases.createDocument(
+            config.databaseId!,
+            config.ordersCollectionId!,
+            ID.unique(),
+            { userId, shippingAddress, totalAmount, status: 'pending' }
+        );
+        if (!newOrder) throw new Error("Gagal membuat data pesanan.");
+
+        const itemPromises = cartItems.map(item => 
+            Promise.all([
+                databases.createDocument(
+                    config.databaseId!,
+                    config.orderItemsCollectionId!,
+                    ID.unique(),
+                    {
+                        orderId: newOrder.$id,
+                        productId: item.productId,
+                        quantity: item.quantity,
+                        priceAtPurchase: item.product?.price || 0
+                    }
+                ),
+                databases.deleteDocument(config.databaseId!, config.keranjangCollectionId!, item.$id)
+            ])
+        );
+
+        await Promise.all(itemPromises);
+        return newOrder.$id;
+
+    } catch (error: any) {
+        console.error("Error saat membuat pesanan:", error);
+        throw new Error(error.message || "Gagal membuat pesanan.");
     }
 }

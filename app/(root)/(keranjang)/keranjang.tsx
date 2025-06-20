@@ -66,7 +66,7 @@ const KeranjangItemCard = ({ item, refetchCart }: { item: MergedCartItem, refetc
       <View style={styles.cardDetails}>
         <View>
           <Text style={styles.cardTitle} numberOfLines={2}>{product.name}</Text>
-          <Text style={styles.cardPrice}>${product.price}</Text>
+          <Text style={styles.cardPrice}>Rp.{product.price}</Text>
         </View>
         <View style={styles.quantityContainer}>
           <TouchableOpacity onPress={() => updateQuantity(item.quantity - 1)} style={styles.quantityButton}>
@@ -167,7 +167,7 @@ const KeranjangScreen = () => {
          <View style={styles.footer}>
             <View style={styles.totalContainer}>
                 <Text style={styles.totalLabel}>Total Harga</Text>
-                <Text style={styles.totalPrice}>${totalHarga.toFixed(2)}</Text>
+                <Text style={styles.totalPrice}>Rp.{totalHarga.toFixed(2)}</Text>
             </View>
             {/* --- UBAH TOMBOL INI --- */}
             <TouchableOpacity 

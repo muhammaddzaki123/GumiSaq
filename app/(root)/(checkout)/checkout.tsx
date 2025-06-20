@@ -158,11 +158,11 @@ const CheckoutScreen = () => {
               <Text style={styles.sectionTitle}>Ringkasan Pesanan</Text>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal ({mergedData.length} item)</Text>
-                <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>Rp.{subtotal.toFixed(2)}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Biaya Pengiriman</Text>
-                <Text style={styles.summaryValue}>${biayaPengiriman.toFixed(2)}</Text>
+                <Text style={styles.summaryValue}>Rp.{biayaPengiriman.toFixed(2)}</Text>
               </View>
               <View style={styles.divider} />
               <View style={styles.summaryRow}>

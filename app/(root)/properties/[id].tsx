@@ -243,7 +243,7 @@ const ProductDetail = () => {
               numberOfLines={1}
               className="text-primary-300 text-start text-2xl font-rubik-bold"
             >
-              ${product?.price}
+              Rp.{product?.price}
             </Text>
           </View>
           
