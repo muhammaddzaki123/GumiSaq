@@ -8,7 +8,7 @@ import {
   Storage,
 } from "react-native-appwrite";
 
-// KONFIGURASI DIpertahankan SESUAI ASLINYA
+// KONFIGURASI DIPERBARUI
 export const config = {
   platform: "com.saqcloth.gumisaq",
   endpoint: process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT,
@@ -26,6 +26,10 @@ export const config = {
   reviewsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_REVIEWS_COLLECTION_ID,
   agentsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AGENTS_COLLECTION_ID,
   stokCollectionId: process.env.EXPO_PUBLIC_APPWRITE_STOK_COLLECTION_ID,
+  
+  // Keranjang Belanja (BARU)
+  keranjangCollectionId: process.env.EXPO_PUBLIC_APPWRITE_KERANJANG_COLLECTION_ID,
+  
   storageBucketId: process.env.EXPO_PUBLIC_APPWRITE_STORAGE_BUCKET_ID || 'default',
 };
 
@@ -263,3 +267,71 @@ export async function getPropertyById({ id }: { id: string }) {
     return null;
   }
 }
+
+// =================================================================
+// FUNGSI KERANJANG BELANJA (CART)
+// =================================================================
+
+/**
+ * Menambahkan produk ke keranjang pengguna.
+ * Jika produk sudah ada, akan menambah quantity-nya.
+ */
+export async function addToCart(userId: string, productId: string) {
+  try {
+    // Cek apakah produk sudah ada di keranjang pengguna
+    const existingCartItem = await databases.listDocuments(
+      config.databaseId!,
+      config.keranjangCollectionId!, // <-- SUDAH DIPERBAIKI
+      [
+        Query.equal("userId", userId),
+        Query.equal("productId", productId)
+      ]
+    );
+
+    if (existingCartItem.documents.length > 0) {
+      // Jika sudah ada, update kuantitasnya
+      const item = existingCartItem.documents[0];
+      const newQuantity = item.quantity + 1;
+      return await databases.updateDocument(
+        config.databaseId!,
+        config.keranjangCollectionId!, // <-- SUDAH DIPERBAIKI
+        item.$id,
+        { quantity: newQuantity }
+      );
+    } else {
+      // Jika belum ada, buat dokumen baru
+      return await databases.createDocument(
+        config.databaseId!,
+        config.keranjangCollectionId!, // <-- SUDAH DIPERBAIKI
+        ID.unique(),
+        {
+          userId,
+          productId,
+          quantity: 1,
+        }
+      );
+    }
+  } catch (error: any) {
+    console.error("Error adding to cart:", error);
+    throw new Error(error.message || "Gagal menambahkan ke keranjang.");
+  }
+}
+
+/**
+ * Mengambil semua item di keranjang milik seorang pengguna.
+ */
+export async function getCartItems(userId: string) {
+  try {
+    const result = await databases.listDocuments(
+      config.databaseId!,
+      config.keranjangCollectionId!, 
+      [Query.equal("userId", userId)]
+    );
+    return result.documents;
+  } catch (error) {
+    console.error('Error fetching cart items:', error);
+    return [];
+  }
+}
+
+export { ID };

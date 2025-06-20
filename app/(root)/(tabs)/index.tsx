@@ -1,3 +1,5 @@
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -6,20 +8,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useEffect } from "react";
-import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import icons from "@/constants/icons";
 
-import Search from "@/components/Search";
+import { Card, FeaturedCard } from "@/components/Cards";
 import Filters from "@/components/Filters";
 import NoResults from "@/components/NoResults";
-import { Card, FeaturedCard } from "@/components/Cards";
+import Search from "@/components/Search";
 
-import { useAppwrite } from "@/lib/useAppwrite";
-import { useGlobalContext } from "@/lib/global-provider";
 import { getLatestProperties, getProperties } from "@/lib/appwrite";
+import { useGlobalContext } from "@/lib/global-provider";
+import { useAppwrite } from "@/lib/useAppwrite";
 
 const Home = () => {
   const { user } = useGlobalContext();
@@ -92,7 +92,13 @@ const Home = () => {
                   </Text>
                 </View>
               </View>
-              <Image source={icons.bell} className="size-6" />
+              <TouchableOpacity onPress={() => router.push('./keranjang')}>
+                <Image 
+                  source={icons.bell} // Pastikan ikon 'cart' ada di constants/icons.ts
+                  className="w-8 h-8" 
+                  tintColor="#191D31"
+                />
+              </TouchableOpacity>
             </View>
 
             <Search />

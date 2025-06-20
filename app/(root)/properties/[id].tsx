@@ -1,32 +1,85 @@
+import { router, useLocalSearchParams } from "expo-router";
 import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
   FlatList,
   Image,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
-  Dimensions,
-  Platform,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
 
-import icons from "@/constants/icons";
-import images from "@/constants/images"; // Pastikan ini diimpor jika digunakan
 import Comment from "@/components/Comment";
-
+import icons from "@/constants/icons";
+import images from "@/constants/images";
+import { addToCart, getPropertyById } from "@/lib/appwrite";
+import { useGlobalContext } from "@/lib/global-provider";
 import { useAppwrite } from "@/lib/useAppwrite";
-import { getPropertyById } from "@/lib/appwrite";
 
 const ProductDetail = () => {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const windowHeight = Dimensions.get("window").height;
 
-  const { data: product } = useAppwrite({
+  // Mengambil data pengguna dari konteks global
+  const { user } = useGlobalContext();
+
+  // Mengambil data produk menggunakan custom hook
+  const { data: product, loading } = useAppwrite({
     fn: getPropertyById,
     params: {
       id: id!,
     },
+    // Hanya jalankan jika 'id' ada
+    skip: !id,
   });
+
+  // Fungsi untuk menangani penambahan item ke keranjang
+  const handleAddToCart = async () => {
+    // 1. Pastikan pengguna sudah login
+    if (!user) {
+      Alert.alert("Perlu Login", "Anda harus masuk terlebih dahulu untuk menambahkan item ke keranjang.");
+      router.push('/sign-in');
+      return;
+    }
+
+    // 2. Pastikan ID produk valid
+    if (!id) {
+        Alert.alert("Error", "ID produk tidak valid.");
+        return;
+    }
+
+    // 3. Panggil fungsi Appwrite untuk menambahkan ke keranjang
+    try {
+      await addToCart(user.$id, id);
+      Alert.alert("Sukses!", "Produk berhasil ditambahkan ke keranjang.");
+    } catch (error: any) {
+      console.error("Failed to add to cart:", error);
+      Alert.alert("Error", error.message || "Gagal menambahkan produk ke keranjang.");
+    }
+  };
+
+  if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator size="large" color="#526346" />
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View className="flex-1 items-center justify-center bg-white p-5">
+        <Text className="text-xl font-rubik-bold text-center">Produk tidak ditemukan.</Text>
+        <TouchableOpacity onPress={() => router.back()} className="mt-5 bg-primary-100 px-4 py-2 rounded-lg">
+            <Text className="text-white font-rubik-medium">Kembali</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
 
   return (
     <View className="flex-1 bg-white">
@@ -110,27 +163,29 @@ const ProductDetail = () => {
           </View>
           
           {/* Info Agen / Penjual */}
-          <View className="w-full pt-7 mt-5">
-            <Text className="text-black-300 text-xl font-rubik-bold">
-              Penjual
-            </Text>
-            <View className="flex flex-row items-center justify-between mt-4">
-              <View className="flex flex-row items-center">
-                <Image
-                  source={{ uri: product?.agent.avatar }}
-                  className="size-14 rounded-full"
-                />
-                <View className="flex flex-col items-start justify-center ml-3">
-                  <Text className="text-lg text-black-300 text-start font-rubik-bold">
-                    {product?.agent.name}
-                  </Text>
-                  <Text className="text-sm text-black-200 text-start font-rubik-medium">
-                    {product?.agent.email}
-                  </Text>
+          {product?.agent && (
+            <View className="w-full pt-7 mt-5">
+              <Text className="text-black-300 text-xl font-rubik-bold">
+                Penjual
+              </Text>
+              <View className="flex flex-row items-center justify-between mt-4">
+                <View className="flex flex-row items-center">
+                  <Image
+                    source={{ uri: product?.agent.avatar }}
+                    className="size-14 rounded-full"
+                  />
+                  <View className="flex flex-col items-start justify-center ml-3">
+                    <Text className="text-lg text-black-300 text-start font-rubik-bold">
+                      {product?.agent.name}
+                    </Text>
+                    <Text className="text-sm text-black-200 text-start font-rubik-medium">
+                      {product?.agent.email}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          )}
 
 
           {/* Galeri Produk */}
@@ -178,7 +233,8 @@ const ProductDetail = () => {
 
       {/* Bagian Bawah (Harga & Tombol Beli) */}
       <View className="absolute bg-white bottom-0 w-full rounded-t-2xl border-t border-gray-200 p-5 shadow-lg">
-        <View className="flex flex-row items-center justify-between gap-5">
+        <View className="flex flex-row items-center justify-between gap-3">
+          {/* Harga */}
           <View className="flex flex-col items-start">
             <Text className="text-black-200 text-sm font-rubik-medium">
               Harga
@@ -190,11 +246,28 @@ const ProductDetail = () => {
               ${product?.price}
             </Text>
           </View>
-          <TouchableOpacity className="flex-1 flex flex-row items-center justify-center bg-primary-300 py-4 rounded-full shadow-md shadow-zinc-400">
-            <Text className="text-white text-lg text-center font-rubik-bold">
-              Beli Sekarang
-            </Text>
-          </TouchableOpacity>
+          
+          {/* Grup Tombol Aksi */}
+          <View className="flex-1 flex-row items-center gap-3">
+            {/* Tombol Tambah ke Keranjang */}
+            <TouchableOpacity 
+              className="p-3 border border-primary-300 rounded-full"
+              onPress={handleAddToCart}
+            >
+              <Image 
+                source={icons.heart} // Ganti dengan ikon keranjang Anda
+                className="size-6" 
+                tintColor={"#747171"} 
+              />
+            </TouchableOpacity>
+
+            {/* Tombol Beli Sekarang */}
+            <TouchableOpacity className="flex-1 flex items-center justify-center bg-primary-300 py-4 rounded-full shadow-md shadow-zinc-400">
+              <Text className="text-white text-lg text-center font-rubik-bold">
+                Beli Sekarang
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
