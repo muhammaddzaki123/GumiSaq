@@ -1,3 +1,5 @@
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -7,14 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useEffect } from "react";
-import { router, useLocalSearchParams } from "expo-router";
 
-import icons from "@/constants/icons";
-import Search from "@/components/Search";
 import { Card } from "@/components/Cards";
 import Filters from "@/components/Filters";
 import NoResults from "@/components/NoResults";
+import Search from "@/components/Search";
+import icons from "@/constants/icons";
 
 import { getProperties } from "@/lib/appwrite";
 import { useAppwrite } from "@/lib/useAppwrite";
@@ -74,7 +74,7 @@ const Explore = () => {
               </TouchableOpacity>
 
               <Text className="text-base mr-2 text-center font-rubik-medium text-black-300">
-                Search for Your Ideal Home
+                search your wanted
               </Text>
               <Image source={icons.bell} className="w-6 h-6" />
             </View>

@@ -164,15 +164,19 @@ const KeranjangScreen = () => {
       )}
 
       {mergedData.length > 0 && (
-        <View style={styles.footer}>
-          <View style={styles.totalContainer}>
-            <Text style={styles.totalLabel}>Total Harga</Text>
-            <Text style={styles.totalPrice}>${totalHarga.toFixed(2)}</Text>
-          </View>
-          <TouchableOpacity style={[styles.primaryButton, { marginTop: 16, width: '100%' }]}>
-            <Text style={styles.primaryButtonText}>Lanjutkan ke Checkout</Text>
-          </TouchableOpacity>
-        </View>
+         <View style={styles.footer}>
+            <View style={styles.totalContainer}>
+                <Text style={styles.totalLabel}>Total Harga</Text>
+                <Text style={styles.totalPrice}>${totalHarga.toFixed(2)}</Text>
+            </View>
+            {/* --- UBAH TOMBOL INI --- */}
+            <TouchableOpacity 
+              onPress={() => router.push({ pathname: '/checkout', params: { total: totalHarga } })} 
+              style={[styles.primaryButton, { marginTop: 16, width: '100%' }]}
+            >
+                <Text style={styles.primaryButtonText}>Lanjutkan ke Checkout</Text>
+            </TouchableOpacity>
+         </View>
       )}
     </SafeAreaView>
   );
