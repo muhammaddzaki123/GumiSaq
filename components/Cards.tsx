@@ -8,6 +8,18 @@ interface Props {
   onPress?: () => void;
 }
 
+/**
+ * Fungsi untuk memformat angka menjadi format mata uang Rupiah.
+ * @param value Angka yang akan diformat.
+ * @returns String harga dalam format Rupiah (e.g., "Rp 100.000").
+ */
+const formatRupiah = (value: number | undefined | null) => {
+  if (value === null || value === undefined) {
+    return 'Rp 0';
+  }
+  return `Rp ${Number(value).toLocaleString('id-ID')}`;
+};
+
 export const FeaturedCard = ({ item, onPress }: Props) => {
   return (
     <TouchableOpacity
@@ -40,8 +52,9 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
         </Text>
 
         <View className="flex flex-row items-center justify-between w-full">
+          {/* PERUBAHAN DI SINI */}
           <Text className="text-xl font-rubik-extrabold text-white">
-            Rp.{item.price}
+            {formatRupiah(item.price)}
           </Text>
           <Image source={icons.heart} className="size-5" />
         </View>
@@ -74,8 +87,9 @@ export const Card = ({ item, onPress }: Props) => {
         </Text>
 
         <View className="flex flex-row items-center justify-between mt-2">
+          {/* PERUBAHAN DI SINI */}
           <Text className="text-base font-rubik-bold text-primary-300">
-            ${item.price}
+            {formatRupiah(item.price)}
           </Text>
           <Image
             source={icons.heart}

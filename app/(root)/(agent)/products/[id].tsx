@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { ProductForm } from '@/constants/agent/ProductForm';
 import { config, databases } from '@/lib/appwrite';
 import { useGlobalContext } from '@/lib/global-provider';
@@ -22,26 +22,32 @@ export default function EditProduct() {
   }, [user, id]);
 
   const loadProduct = async () => {
-    if (!id) return;
+    // Pastikan id adalah string tunggal
+    const productId = Array.isArray(id) ? id[0] : id;
+    if (!productId) return;
     
     try {
       const doc = await databases.getDocument(
         config.databaseId!,
         config.stokCollectionId!,
-        id.toString()
+        productId
       );
-      if (!user) return;
-      
-      setProduct({
+
+      // Memetakan data dari dokumen ke interface Product yang benar
+      const fetchedProduct: Product = {
         $id: doc.$id,
         name: doc.name || '',
         price: Number(doc.price) || 0,
         description: doc.description || '',
         image: doc.image,
-        category: doc.category || '',
-        agentId: doc.agentId || user.$id,
+        type: doc.type || 'Other', // Menggunakan 'type' dan memberikan nilai default
+        gallery: doc.gallery || [], // Menggunakan 'gallery'
+        agentId: doc.agentId || user!.$id, // Menggunakan 'agentrelationship'
         status: doc.status || 'active'
-      });
+      };
+      
+      setProduct(fetchedProduct);
+
     } catch (error) {
       console.error('Error loading product:', error);
       router.back();
@@ -70,13 +76,16 @@ export default function EditProduct() {
       />
 
       <ScrollView className="flex-1 p-4">
-        <ProductForm
-          mode="edit"
-          initialData={product}
-          onSuccess={() => {
-            router.back();
-          }}
-        />
+        {/* Pastikan ProductForm menerima data produk yang sudah dimuat */}
+        {product && (
+            <ProductForm
+              mode="edit"
+              initialData={product}
+              onSuccess={() => {
+                router.back();
+              }}
+            />
+        )}
       </ScrollView>
     </View>
   );
