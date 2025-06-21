@@ -106,11 +106,19 @@ export async function getCurrentUser() {
     const currentAccount = await account.get();
     if (!currentAccount) return null;
 
-    return await databases.getDocument(
+    const userDoc = await databases.getDocument(
       config.databaseId!,
       config.usersProfileCollectionId!,
       currentAccount.$id
     );
+
+    return {
+      $id: userDoc.$id,
+      name: userDoc.name,
+      email: userDoc.email,
+      avatar: userDoc.avatar,
+      userType: userDoc.userType as 'user' | 'admin' | 'agent'
+    };
   } catch (error) {
     console.log("Tidak ada sesi aktif atau profil pengguna tidak ditemukan.");
     return null;

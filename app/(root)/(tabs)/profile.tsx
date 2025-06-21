@@ -164,6 +164,19 @@ const Profile = () => {
         </View>
 
         <View className="flex flex-col mt-10">
+          {user?.userType === 'agent' ? (
+            <SettingsItem 
+              icon={icons.home} 
+              title="Dashboard Agen" 
+              onPress={() => router.push('/(root)/(agent)/dashboard')}
+            />
+          ) : (
+            <SettingsItem 
+              icon={icons.home} 
+              title="Daftar Sebagai Agen" 
+              onPress={() => router.push('/(root)/(agen-auth)/register')}
+            />
+          )}
           <SettingsItem icon={icons.home} title="My Bookings" />
           <SettingsItem icon={icons.home} title="Payments" />
         </View>
