@@ -57,10 +57,10 @@ export const featuredCards = [
 
 export const categories = [
   { title: "All", category: "All" },
-  { title: "Baju", category: "baju" },
-  { title: "Celana", category: "celna" },
-  { title: "Tote Bag", category: "tas" },
-  { title: "Sofenir", category: "sofenir" },
+  { title: "Baju", category: "Baju" },
+  { title: "Celana", category: "Celana" },
+  { title: "Tote Bag", category: "Tas" },
+  { title: "Sofenir", category: "Sofenir" },
 ];
 
 export const settings = [

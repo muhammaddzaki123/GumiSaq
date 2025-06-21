@@ -20,7 +20,7 @@ export const useArticles = (): UseArticlesResult => {
     const fetchData = async () => {
       try {
         const fetchedArticles = await getArticles();
-        const publishedArticles = (fetchedArticles as Article[]).filter(
+        const publishedArticles = (fetchedArticles as unknown as Article[]).filter(
           article => article.isPublished
         );
         setArticles(publishedArticles);
