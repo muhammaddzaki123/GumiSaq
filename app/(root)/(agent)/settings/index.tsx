@@ -1,8 +1,8 @@
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { config, databases } from '../../../../lib/appwrite';
-import { useGlobalContext } from '../../../../lib/global-provider';
+import { config, databases } from '@/lib/appwrite';
+import { useGlobalContext } from '@/lib/global-provider';
 
 interface AgentProfile {
   name: string;
