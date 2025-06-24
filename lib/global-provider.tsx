@@ -16,6 +16,8 @@ interface User {
   email: string;
   avatar: string;
   userType: 'user' | 'admin' | 'agent';
+  alamat: string;
+  noHp: string;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);

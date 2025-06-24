@@ -1,8 +1,8 @@
+import { Ionicons } from "@expo/vector-icons";
 import { Href, Stack, useRouter } from 'expo-router';
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useGlobalContext } from '../../../lib/global-provider';
-
 export default function AgentDashboard() {
   const router = useRouter();
   const { user } = useGlobalContext();
@@ -56,6 +56,17 @@ export default function AgentDashboard() {
           },
         }}
       />
+
+      {/* Header */}
+      <View className="px-5">
+        <View className="flex flex-row items-center justify-between mt-5">
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={28} color="#191D31" />
+          </TouchableOpacity>
+          <Text className="text-xl font-rubik-bold text-black-300">Detail Profile</Text>
+          <View style={{ width: 24 }} /> {/* Spacer */}
+        </View>
+      </View>
 
       <ScrollView className="flex-1 p-4">
         <View className="bg-primary-300 p-6 rounded-xl mb-6">
