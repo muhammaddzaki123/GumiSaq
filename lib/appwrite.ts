@@ -55,7 +55,7 @@ export const storage = new Storage(client);
 /**
  * Membuat pengguna baru dan menyimpan profilnya di Database.
  */
-export async function createUser(email: string, password: string, name: string, alamat: string) {
+export async function createUser(email: string, password: string, name: string) {
   try {
     const newAccount = await account.create(ID.unique(), email, password, name);
     if (!newAccount) throw new Error("Gagal membuat akun.");
@@ -74,7 +74,6 @@ export async function createUser(email: string, password: string, name: string, 
         avatar: avatarUrl.toString(),
         userType: 'user',
         addresses: [], // Inisialisasi 'addresses' sebagai array kosong
-        alamat,
       }
     );
 
