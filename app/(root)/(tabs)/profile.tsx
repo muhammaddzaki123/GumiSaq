@@ -148,42 +148,44 @@ const Profile = () => {
           <Image source={icons.bell} className="size-5" />
         </View>
 
-        <View className="flex flex-row justify-center mt-5">
-          <View className="flex flex-col items-center relative mt-5">
-            <Image
-              source={{ uri: user?.avatar || 'https://via.placeholder.com/150' }}
-              onError={() => console.error('Failed to load profile image')}
-              className="size-44 relative rounded-full"
-            />
-            <TouchableOpacity onPress={handleImagePick} className="absolute bottom-11 right-2">
-              <Image source={icons.edit} className="size-9" />
-            </TouchableOpacity>
-
-            <Text className="text-2xl font-rubik-bold mt-2">{user?.name}</Text>
-          </View>
+        <View className="flex flex-col items-center mt-8">
+          <Image
+            source={{
+              uri: !user?.avatar
+                ? 'https://via.placeholder.com/150'
+                : user.avatar,
+            }}
+            className="size-36 rounded-full"
+          />
+          <Text className="text-2xl font-rubik-bold mt-2">{user?.name}</Text>
         </View>
 
-        <View className="flex flex-col mt-10">
+        <View className="flex flex-col mt-5 border-t pt-5 border-primary-200">
           {user?.userType === 'agent' ? (
             <SettingsItem 
-              icon={icons.home} 
+              icon={icons.dashboard} 
               title="Dashboard Agen" 
               onPress={() => router.push('/(root)/(agent)/dashboard')}
             />
           ) : (
             <SettingsItem 
-              icon={icons.home} 
+              icon={icons.dashboard} 
               title="Daftar Sebagai Agen" 
               onPress={() => router.push('/(root)/(agen-auth)/register')}
             />
           )}
-          <SettingsItem icon={icons.home} title="My Bookings" />
-          <SettingsItem icon={icons.home} title="Payments" />
-        </View>
 
-        <View className="flex flex-col mt-5 border-t pt-5 border-primary-200">
-          {settings.slice(2).map((item, index) => (
-            <SettingsItem key={index} {...item} />
+          {settings.slice(1).map((item, index) => (
+            <SettingsItem
+              key={index}
+              icon={item.icon}
+              title={item.title}
+              onPress={() => {
+                if (item.route) {
+                  router.push(item.route as any); // or as unknown as RouteType if you know the type
+                }
+              }}
+            />
           ))}
         </View>
 

@@ -55,7 +55,7 @@ export const storage = new Storage(client);
 /**
  * Membuat pengguna baru dan menyimpan profilnya di Database.
  */
-export async function createUser(email: string, password: string, name: string) {
+export async function createUser(email: string, password: string, name: string, alamat: string) {
   try {
     const newAccount = await account.create(ID.unique(), email, password, name);
     if (!newAccount) throw new Error("Gagal membuat akun.");
@@ -74,6 +74,7 @@ export async function createUser(email: string, password: string, name: string) 
         avatar: avatarUrl.toString(),
         userType: 'user',
         addresses: [], // Inisialisasi 'addresses' sebagai array kosong
+        alamat,
       }
     );
 
@@ -117,7 +118,9 @@ export async function getCurrentUser() {
       name: userDoc.name,
       email: userDoc.email,
       avatar: userDoc.avatar,
-      userType: userDoc.userType as 'user' | 'admin' | 'agent'
+      userType: userDoc.userType as 'user' | 'admin' | 'agent',
+      alamat: userDoc.alamat,
+      noHp: userDoc.noHp || '',
     };
   } catch (error) {
     console.log("Tidak ada sesi aktif atau profil pengguna tidak ditemukan.");

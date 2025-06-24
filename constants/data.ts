@@ -65,36 +65,24 @@ export const categories = [
 
 export const settings = [
   {
-    title: "My Bookings",
-    icon: icons.person,
+    title: "Dashboard",
+    icon: icons.dashboard,
+    route: "/dashboard",
   },
   {
-    title: "Payments",
-    icon: icons.person,
+    title: "Profil",
+    icon: icons.user,
+    route: "/profile-detail",
   },
   {
-    title: "Profile",
-    icon: icons.person,
+    title: "Keranjang",
+    icon: icons.cart,
+    route: "/keranjang",
   },
   {
-    title: "Notifications",
-    icon: icons.bell,
-  },
-  {
-    title: "Security",
-    icon: icons.bell,
-  },
-  {
-    title: "Language",
-    icon: icons.bell,
-  },
-  {
-    title: "Help Center",
-    icon: icons.bell,
-  },
-  {
-    title: "Invite Friends",
-    icon: icons.bell,
+    title: "Alamat Pengiriman",
+    icon: icons.alamat,
+    route: "/address-manager",
   },
 ];
 
