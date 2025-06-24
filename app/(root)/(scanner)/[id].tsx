@@ -37,7 +37,7 @@ export default function VideoDetailScreen() {
 
       const videoDocument = await databases.getDocument(
         config.databaseId!,
-        config.collectionId,
+        config.storageBucketId!,
         videoId
       );
 

@@ -66,6 +66,16 @@ const TabsLayout = () => {
 					),
 				}}
 			/>
+			<Tabs.Screen
+				name="scanner"
+				options={{
+					title: "scanner",
+					headerShown: false,
+					tabBarIcon: ({ focused }) => (
+						<TabIcon icon={icons.search} focused={focused} title={"scanner"} />
+					),
+				}}
+			/>
 				<Tabs.Screen
 					name="artikel"
 					options={{
