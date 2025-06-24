@@ -34,7 +34,7 @@ const ProfileDetail = () => {
               <Ionicons name="arrow-back" size={28} color="#191D31" />
             </TouchableOpacity>
             <Text className="text-xl font-rubik-bold text-black-300">Detail Profile</Text>
-            <View style={{ width: 24 }} /> {/* Spacer */}
+            <View style={{ width: 24 }} />
           </View>
         </View>
 
@@ -67,7 +67,6 @@ const ProfileDetail = () => {
               Informasi Personal
             </Text>
           </View>
-          
           <ProfileDetailItem label="Nama Lengkap" value={user?.name} />
           <ProfileDetailItem label="Email" value={user?.email} />
           <ProfileDetailItem label="Tipe User" value={user?.userType} />
@@ -83,7 +82,6 @@ const ProfileDetail = () => {
           >
             <Text className="text-white text-base font-rubik-bold">Edit Profile</Text>
           </TouchableOpacity>
-
           <TouchableOpacity
             className="bg-white border border-primary-100 rounded-lg py-4 flex flex-row items-center justify-center shadow-sm"
             onPress={() => router.push('/change-password')}
@@ -93,14 +91,13 @@ const ProfileDetail = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Additional Info Cards - Similar to Featured section */}
+        {/* Additional Info Cards */}
         <View className="px-5 mt-8">
           <View className="flex flex-row items-center justify-between mb-5">
             <Text className="text-xl font-rubik-bold text-black-300">
               Status Akun
             </Text>
           </View>
-          
           <View className="flex flex-row gap-3">
             <View className="flex-1 bg-green-50 rounded-lg p-4 border border-green-100">
               <View className="flex flex-row items-center">
@@ -113,7 +110,6 @@ const ProfileDetail = () => {
                 </View>
               </View>
             </View>
-            
             <View className="flex-1 bg-blue-50 rounded-lg p-4 border border-blue-100">
               <View className="flex flex-row items-center">
                 <View className="bg-blue-100 rounded-full p-2 mr-3">

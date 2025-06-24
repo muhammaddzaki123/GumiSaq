@@ -1,13 +1,11 @@
 import icons from "@/constants/icons";
 import { account } from "@/lib/appwrite";
-import { useGlobalContext } from "@/lib/global-provider";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const ChangePassword = () => {
-  const { user } = useGlobalContext();
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,7 +22,6 @@ const ChangePassword = () => {
     }
     setLoading(true);
     try {
-      // Appwrite: Update password
       await account.updatePassword(newPassword, oldPassword);
       Alert.alert("Berhasil", "Password berhasil diganti.");
       router.back();

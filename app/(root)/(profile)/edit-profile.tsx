@@ -4,7 +4,6 @@ import { useGlobalContext } from '@/lib/global-provider';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from "expo-router";
 import { useState } from "react";
-
 import {
   Alert,
   Image,
@@ -54,70 +53,60 @@ const EditProfile = () => {
     }
   };
 
-    const handleImagePick = async () => {
-      try {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        
-        if (status !== 'granted') {
-          Alert.alert("Permission Required", "You need to grant access to your photos to change profile picture.");
-          return;
-        }
-  
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: true,
-          aspect: [1, 1],
-          quality: 0.5,
-        });
-  
-        if (!result.canceled) {
-          Alert.alert("Uploading...", "Please wait while we update your profile picture.");
-  
-          const file = {
-            name: `avatar-${user?.$id}-${Date.now()}.jpg`,
-            type: 'image/jpeg',
-            uri: result.assets[0].uri,
-            size: await new Promise<number>((resolve) => {
-              fetch(result.assets[0].uri)
-                .then((response) => response.blob())
-                .then((blob) => resolve(blob.size))
-            })
-          };
-  
-          const uploadedFile = await storage.createFile(
-            config.storageBucketId,
-            'unique()',
-            file
-          );
-  
-          const fileUrl = storage.getFileView(config.storageBucketId, uploadedFile.$id);
-          console.log('Generated avatar URL:', fileUrl.href);
-  
-          try {
-            console.log('Updating user profile:', user!.$id);
-            const updated = await databases.updateDocument(
-              config.databaseId!,
-              config.usersProfileCollectionId!,
-              user!.$id,
-              { avatar: fileUrl.href }
-            );
-            console.log('User profile updated:', updated);
-  
-            console.log('Refreshing user data...');
-            await refetch();
-            console.log('User data refreshed');
-          } catch (updateError) {
-            console.error('Error updating profile:', updateError);
-            throw updateError;
-          }
-  
-          Alert.alert("Success", "Profile picture updated successfully!");
-        }
-      } catch (error) {
-        console.error('Error updating profile picture:', error);
-        Alert.alert("Error", "Failed to update profile picture. Please try again.");
+  const handleImagePick = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert("Permission Required", "You need to grant access to your photos to change profile picture.");
+        return;
       }
-    };
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled) {
+        Alert.alert("Uploading...", "Please wait while we update your profile picture.");
+
+        const file = {
+          name: `avatar-${user?.$id}-${Date.now()}.jpg`,
+          type: 'image/jpeg',
+          uri: result.assets[0].uri,
+          size: await new Promise<number>((resolve) => {
+            fetch(result.assets[0].uri)
+              .then((response) => response.blob())
+              .then((blob) => resolve(blob.size))
+          })
+        };
+
+        const uploadedFile = await storage.createFile(
+          config.storageBucketId!,
+          'unique()',
+          file
+        );
+
+        const fileUrl = storage.getFileView(config.storageBucketId!, uploadedFile.$id);
+        
+        await databases.updateDocument(
+          config.databaseId!,
+          config.usersProfileCollectionId!,
+          user!.$id,
+          { avatar: fileUrl.href }
+        );
+        
+        await refetch();
+
+        Alert.alert("Success", "Profile picture updated successfully!");
+      }
+    } catch (error) {
+      console.error('Error updating profile picture:', error);
+      Alert.alert("Error", "Failed to update profile picture. Please try again.");
+    }
+  };
 
   return (
     <SafeAreaView className="h-full bg-white">
@@ -130,7 +119,7 @@ const EditProfile = () => {
             <Image source={icons.leftArrow} className="size-6" />
           </TouchableOpacity>
           <Text className="text-xl font-rubik-bold">Edit Profile</Text>
-          <View style={{ width: 24 }} /> {/* Spacer */}
+          <View style={{ width: 24 }} />
         </View>
 
         <View className="flex flex-row justify-center mt-5">
@@ -143,7 +132,6 @@ const EditProfile = () => {
             <TouchableOpacity onPress={handleImagePick} className="absolute bottom-11 right-2">
               <Image source={icons.edit} className="size-9" />
             </TouchableOpacity>
-
             <Text className="text-2xl font-rubik-bold mt-2">{user?.name}</Text>
           </View>
         </View>
