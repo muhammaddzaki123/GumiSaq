@@ -38,7 +38,7 @@ export default function ScannerScreen() {
       setScanned(true);
       console.log(`QR Code scanned: type ${type}, data ${data}`);
 
-      router.push(`./scanner/${data}`);
+    router.push(`/(scanner)/${data}`);
     }
   };
 

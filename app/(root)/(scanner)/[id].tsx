@@ -1,3 +1,4 @@
+import { config, databases, storage } from '@/lib/appwrite';
 import { ResizeMode, Video } from 'expo-av';
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -9,7 +10,6 @@ import {
   Text,
   View
 } from 'react-native';
-import { config, databases, storage } from '../../../lib/appwrite';
 
 const { width, height } = Dimensions.get('window');
 
@@ -37,7 +37,7 @@ export default function VideoDetailScreen() {
 
       const videoDocument = await databases.getDocument(
         config.databaseId!,
-        config.storageBucketId!,
+        config.collectionId!,
         videoId
       );
 
@@ -101,7 +101,7 @@ export default function VideoDetailScreen() {
         <Video
           ref={videoRef}
           style={styles.fullscreenVideo}
-          source={{ uri: videoUrl.replace(/^.*?(?=https:\/\/fra\.cloud\.appwrite\.io)/, '') }}
+          source={{ uri: videoUrl }}
           resizeMode={ResizeMode.CONTAIN}
           shouldPlay={false}
           useNativeControls
