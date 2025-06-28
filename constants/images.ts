@@ -3,6 +3,7 @@ import cardgradient from "@/assets/images/card-gradient.png";
 import logoawal from "@/assets/images/logoawal.jpg";
 import noResult from "@/assets/images/noResult.jpg";
 import whiteGradient from "@/assets/images/white-gradient.png";
+import baju_polos from "@/assets/images/baju_polos.png";
 
 
 export default {
@@ -11,4 +12,5 @@ export default {
   baju,
   cardgradient,
   noResult,
+  baju_polos,
 };

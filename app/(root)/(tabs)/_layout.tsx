@@ -76,6 +76,16 @@ const TabsLayout = () => {
 					),
 				}}
 			/>
+			<Tabs.Screen
+				name="shirt-editor"
+				options={{
+					title: "edit",
+					headerShown: false,
+					tabBarIcon: ({ focused }) => (
+						<TabIcon icon={icons.edit} focused={focused} title={"edit"} />
+					),
+				}}
+			/>
 				<Tabs.Screen
 					name="artikel"
 					options={{
