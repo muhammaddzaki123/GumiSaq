@@ -56,26 +56,7 @@ const TabsLayout = () => {
 					),
 				}}
 			/>
-			<Tabs.Screen
-				name="explore"
-				options={{
-					title: "Explore",
-					headerShown: false,
-					tabBarIcon: ({ focused }) => (
-						<TabIcon icon={icons.search} focused={focused} title={"Explore"} />
-					),
-				}}
-			/>
-			<Tabs.Screen
-				name="scanner"
-				options={{
-					title: "scanner",
-					headerShown: false,
-					tabBarIcon: ({ focused }) => (
-						<TabIcon icon={icons.search} focused={focused} title={"scanner"} />
-					),
-				}}
-			/>
+
 			<Tabs.Screen
 				name="shirt-editor"
 				options={{
@@ -83,6 +64,16 @@ const TabsLayout = () => {
 					headerShown: false,
 					tabBarIcon: ({ focused }) => (
 						<TabIcon icon={icons.edit} focused={focused} title={"edit"} />
+					),
+				}}
+			/>
+						<Tabs.Screen
+				name="scanner"
+				options={{
+					title: "scanner",
+					headerShown: false,
+					tabBarIcon: ({ focused }) => (
+						<TabIcon icon={icons.search} focused={focused} title={"scanner"} />
 					),
 				}}
 			/>

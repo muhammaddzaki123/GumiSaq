@@ -119,7 +119,8 @@ const Home = () => {
                 <Text className="text-2xl font-rubik-bold text-black-300">
                   Unggulan
                 </Text>
-                <TouchableOpacity>
+
+                <TouchableOpacity onPress={() => router.push('/explore')}>
                   <Text className="text-base font-rubik-medium text-primary-100">
                     Lihat Semua
                   </Text>
