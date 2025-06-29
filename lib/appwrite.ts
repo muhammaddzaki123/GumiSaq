@@ -538,3 +538,24 @@ export async function getDesignFonts() {
     throw new Error("Gagal memuat font.");
   }
 }
+
+export async function saveFinishedDesign(userId: string, name: string, imageUrl: string) {
+  try {
+    // Ganti 'YOUR_FINISHED_DESIGNS_COLLECTION_ID' dengan ID koleksi Anda
+    const finishedDesignsCollectionId = "68616d2f002cb7063304";
+
+    await databases.createDocument(
+      config.databaseId!,
+      finishedDesignsCollectionId,
+      ID.unique(),
+      {
+        userId,
+        name,
+        imageUrl,
+      }
+    );
+  } catch (error: any) {
+    console.error("Error saat menyimpan gambar desain:", error);
+    throw new Error(error.message || "Gagal menyimpan gambar desain.");
+  }
+}
