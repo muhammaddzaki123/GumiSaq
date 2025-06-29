@@ -1,11 +1,12 @@
 import { useGlobalContext } from '@/lib/global-provider';
-import { getFinishedDesigns } from '@/lib/appwrite'; 
+import { getFinishedDesigns, addCustomDesignToCart } from '@/lib/appwrite'; 
 import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Text,
@@ -14,7 +15,6 @@ import {
 } from 'react-native';
 import { Models } from 'react-native-appwrite';
 
-// Tipe data ini diperbarui agar lebih kuat
 interface FinishedDesignItem extends Models.Document {
   name?: string;
   imageUrl: string; 
@@ -22,8 +22,24 @@ interface FinishedDesignItem extends Models.Document {
   shirtColor: string; 
 };
 
+// --- Komponen Kartu yang Diperbarui ---
 const FinishedDesignCard = ({ item }: { item: FinishedDesignItem }) => {
+  const { user } = useGlobalContext();
+  const [isAdding, setIsAdding] = useState(false);
 
+  // Fungsi untuk menghitung harga
+  const calculatePrice = () => {
+    try {
+      const elements = JSON.parse(item.designData);
+      const stickerCount = elements.filter((el: any) => el.type === 'sticker').length;
+      return 30000 + stickerCount * 15000;
+    } catch (e) {
+      return 30000; // Harga dasar jika gagal parsing
+    }
+  };
+
+  const price = calculatePrice();
+  
   const handleEdit = () => {
     router.push({
       pathname: '/(root)/(tabs)/shirt-editor',
@@ -32,6 +48,27 @@ const FinishedDesignCard = ({ item }: { item: FinishedDesignItem }) => {
         shirtColor: item.shirtColor,
       }
     });
+  };
+
+  const handleAddToCart = async () => {
+    if (!user) {
+        Alert.alert("Login Diperlukan", "Anda harus masuk untuk menambahkan item.");
+        return;
+    }
+    
+    setIsAdding(true);
+    try {
+        await addCustomDesignToCart(user.$id, {
+            name: item.name || `Desain Kustom #${item.$id.slice(-6)}`,
+            imageUrl: item.imageUrl,
+            designData: item.designData,
+        });
+        Alert.alert("Sukses", "Desain berhasil ditambahkan ke keranjang!");
+    } catch (error: any) {
+        Alert.alert("Error", error.message);
+    } finally {
+        setIsAdding(false);
+    }
   };
 
   return (
@@ -45,21 +82,45 @@ const FinishedDesignCard = ({ item }: { item: FinishedDesignItem }) => {
         <Text className="font-rubik-bold text-lg text-black-300">
           {item.name || `Desain-${item.$id.slice(-6)}`}
         </Text>
-        <Text className="font-rubik text-xs text-gray-400 mt-2">
+        <Text className="text-xl font-rubik-extrabold text-primary-100 mt-2">
+          Rp {price.toLocaleString('id-ID')}
+        </Text>
+        <Text className="font-rubik text-xs text-gray-400 mt-1">
           Dibuat pada: {new Date(item.$createdAt).toLocaleDateString()}
         </Text>
-        <TouchableOpacity 
-          onPress={handleEdit}
-          className="bg-primary-100 p-3 rounded-lg mt-4 items-center flex-row justify-center"
-        >
-          <Ionicons name="create-outline" size={18} color="white" />
-          <Text className="text-white font-rubik-bold ml-2">Edit Desain Ini</Text>
-        </TouchableOpacity>
+        
+        {/* Grup Tombol Aksi */}
+        <View className="mt-4 space-y-2">
+            <TouchableOpacity 
+              onPress={handleEdit}
+              className="bg-gray-200 p-3 rounded-lg items-center flex-row justify-center"
+            >
+              <Ionicons name="create-outline" size={18} color="#333" />
+              <Text className="text-black font-rubik-bold ml-2">Edit Desain</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              onPress={handleAddToCart}
+              disabled={isAdding}
+              className={`p-3 rounded-lg items-center flex-row justify-center ${isAdding ? 'bg-gray-400' : 'bg-primary-100'}`}
+            >
+              {isAdding ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Ionicons name="cart-outline" size={18} color="white" />
+                  <Text className="text-white font-rubik-bold ml-2">Tambah ke Keranjang</Text>
+                </>
+              )}
+            </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
 };
 
+
+// --- Komponen Utama Halaman (tetap sama) ---
 const MyDesignsScreen = () => {
   const { user } = useGlobalContext();
 
@@ -96,7 +157,6 @@ const MyDesignsScreen = () => {
         </View>
       ) : (
         <FlatList
-          // PERBAIKAN: Memberikan tipe yang jelas pada data
           data={designs as FinishedDesignItem[]}
           keyExtractor={(item) => item.$id}
           renderItem={({ item }) => <FinishedDesignCard item={item} />} 

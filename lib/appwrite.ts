@@ -38,6 +38,7 @@ export const config = {
   designFontsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_FONTS_COLLECTION_ID,
   finishedDesignsCollectionId: "68616d2f002cb7063304",
 
+  adminCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ADMIN_COLLECTION_ID,
 };
 
 // Inisialisasi Klien Appwrite
@@ -535,3 +536,51 @@ export async function getFinishedDesigns(userId: string) {
   }
 }
 
+export async function addCustomDesignToCart(
+  userId: string,
+  design: {
+    name: string;
+    imageUrl: string;
+    designData: string;
+  }
+) {
+  try {
+    // 1. Hitung harga berdasarkan jumlah stiker
+    const TSHIRT_PRICE = 30000;
+    const STICKER_PRICE = 15000;
+    const elements = JSON.parse(design.designData);
+    const stickerCount = elements.filter((el: any) => el.type === 'sticker').length;
+    const finalPrice = TSHIRT_PRICE + stickerCount * STICKER_PRICE;
+    
+    // 2. Buat produk baru di koleksi 'stok'
+    const customProduct = await databases.createDocument(
+      config.databaseId!,
+      config.stokCollectionId!, // Menggunakan koleksi stok yang sudah ada
+      ID.unique(),
+      {
+        name: design.name || `Desain Kustom #${ID.unique().slice(0, 6)}`,
+        price: finalPrice,
+        description: `Kaos kustom dengan ${stickerCount} stiker.`,
+        image: design.imageUrl,
+        type: "Baju", // Kategori produk
+        agentId: config.adminCollectionId, // Diatur sebagai produk dari Admin
+        status: 'active',
+        gallery: [], // Galeri bisa dikosongkan
+        isCustom: true, // Tambahkan flag ini jika Anda ingin membedakannya
+      }
+    );
+
+    if (!customProduct) {
+      throw new Error("Gagal membuat produk kustom di database.");
+    }
+    
+    // 3. Tambahkan produk yang baru dibuat ke keranjang pengguna
+    await addToCart(userId, customProduct.$id);
+
+    return customProduct;
+
+  } catch (error: any) {
+    console.error("Error menambah desain kustom ke keranjang:", error);
+    throw new Error(error.message || "Gagal memproses desain kustom.");
+  }
+}
