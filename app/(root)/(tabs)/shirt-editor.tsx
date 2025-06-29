@@ -2,19 +2,26 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import React, { useCallback, useState } from 'react';
 import {
+  Alert,
   Image,
   ImageSourcePropType,
   LayoutChangeEvent,
-  Platform,
   SafeAreaView,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+
+// --- Impor Fungsi Baru ---
+import { saveDesign } from '@/lib/appwrite';
+import { useGlobalContext } from '@/lib/global-provider';
+import { router } from 'expo-router';
+
+// ... (semua konstanta dan komponen anak tetap sama)
 
 // --- ASET ---
 const T_SHIRT_IMAGE = require('@/assets/images/baju_polos.png');
@@ -173,6 +180,9 @@ const ToolTab = ({ icon, label, active, onPress }: { icon: any, label: string, a
 
 // --- Komponen Utama ---
 const ShirtEditorScreen = () => {
+    // --- Hook dan State ---
+    const { user } = useGlobalContext();
+    const [isSaving, setIsSaving] = useState(false);
     const [shirtColor, setShirtColor] = useState('#FFFFFF');
     const [elements, setElements] = useState<ElementState[]>([]);
     const [activeElementId, setActiveElementId] = useState<number | null>(null);
@@ -180,6 +190,7 @@ const ShirtEditorScreen = () => {
     const [activeTool, setActiveTool] = useState<'tshirt' | 'sticker' | 'text'>('tshirt');
     const [canvasBounds, setCanvasBounds] = useState({ width: 0, height: 0 });
 
+    // --- Fungsi Logika ---
     const addElement = (type: 'sticker' | 'text', value: any) => {
         const newElement: ElementState = {
             id: Date.now(), type, value,
@@ -206,6 +217,33 @@ const ShirtEditorScreen = () => {
         setCanvasBounds({ width: width * 0.8, height: height * 0.8 });
     };
 
+    const handleSaveDesign = async () => {
+        if (!user) {
+            Alert.alert("Perlu Login", "Anda harus masuk untuk menyimpan desain.", [
+                { text: "OK", onPress: () => router.push('/sign-in') }
+            ]);
+            return;
+        }
+        if (elements.length === 0) {
+            Alert.alert("Desain Kosong", "Tambahkan stiker atau teks sebelum menyimpan.");
+            return;
+        }
+        setIsSaving(true);
+        try {
+            await saveDesign({
+                userId: user.$id,
+                shirtColor,
+                elements,
+            });
+            Alert.alert("Sukses", "Desain Anda berhasil disimpan!");
+        } catch (error: any) {
+            Alert.alert("Gagal Menyimpan", error.message);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // --- Fungsi Render ---
     const renderToolOptions = () => {
         const activeElement = getActiveElement();
         if (activeElement) {
@@ -246,8 +284,15 @@ const ShirtEditorScreen = () => {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaView className="flex-1 bg-white">
-                <View className="py-4 items-center border-b border-gray-200">
+                {/* --- HEADER BARU DENGAN TOMBOL "DESAIN SAYA" DAN "SIMPAN" --- */}
+                <View className="py-4 px-4 flex-row justify-between items-center border-b border-gray-200">
+                    <TouchableOpacity onPress={() => router.push('/my-designs')} className="p-2">
+                         <Ionicons name="folder-outline" size={28} color="#526346" />
+                    </TouchableOpacity>
                     <Text className="text-xl font-rubik-bold text-black-300">Editor Baju</Text>
+                    <TouchableOpacity onPress={handleSaveDesign} disabled={isSaving} className="p-2">
+                        <Ionicons name="save-outline" size={28} color={isSaving ? "#ccc" : "#526346"} />
+                    </TouchableOpacity>
                 </View>
 
                 <View className="flex-1 p-4 bg-gray-100" onLayout={onCanvasLayout}>

@@ -31,6 +31,7 @@ export const config = {
   keranjangCollectionId: process.env.EXPO_PUBLIC_APPWRITE_KERANJANG_COLLECTION_ID,
   ordersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID,
   orderItemsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ORDER_ITEMS_COLLECTION_ID,
+  designsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_DESIGNS_COLLECTION_ID,
 };
 
 // Inisialisasi Klien Appwrite
@@ -411,5 +412,62 @@ export async function registerAsAgent(userId: string, agentData: { storeName: st
       throw new Error("Anda sudah terdaftar sebagai agen.");
     }
     throw new Error(error.message || "Gagal mendaftar sebagai agen.");
+  }
+}
+
+// =================================================================
+// FUNGSI DESAIN BAJU (SHIRT DESIGNS)
+// =================================================================
+
+/**
+ * Menyimpan data desain baju baru ke database.
+ * @param designData Objek yang berisi data desain.
+ * @returns 
+ */
+export async function saveDesign(designData: {
+  userId: string;
+  shirtColor: string;
+  elements: any[];
+  name?: string;
+}) {
+  try {
+    // Pastikan ID koleksi desain sudah ada di konfigurasi Anda
+    if (!config.designsCollectionId) {
+      throw new Error("ID Koleksi Desain (designsCollectionId) belum diatur di env.");
+    }
+
+    const newDesign = await databases.createDocument(
+      config.databaseId!,
+      config.designsCollectionId, // Gunakan ID koleksi yang baru
+      ID.unique(),
+      {
+        userId: designData.userId,
+        shirtColor: designData.shirtColor,
+        // Konversi array elemen menjadi string JSON untuk disimpan
+        elements: JSON.stringify(designData.elements),
+        name: designData.name || `Desain-${new Date().toLocaleTimeString()}`
+      }
+    );
+    return newDesign;
+  } catch (error: any) {
+    console.error("Error saat menyimpan desain:", error);
+    throw new Error(error.message || "Gagal menyimpan desain.");
+  }
+}
+
+export async function getSavedDesigns(userId: string) {
+  try {
+    if (!config.designsCollectionId) {
+      throw new Error("ID Koleksi Desain (designsCollectionId) belum diatur di env.");
+    }
+    const designs = await databases.listDocuments(
+      config.databaseId!,
+      config.designsCollectionId,
+      [Query.equal("userId", userId), Query.orderDesc("$createdAt")]
+    );
+    return designs.documents;
+  } catch (error: any) {
+    console.error("Error saat mengambil desain yang disimpan:", error);
+    throw new Error(error.message || "Gagal mengambil desain.");
   }
 }
