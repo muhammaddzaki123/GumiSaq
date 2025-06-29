@@ -2,41 +2,41 @@ import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ImageSourcePropType,
-  LayoutChangeEvent,
-  SafeAreaView,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    ImageSourcePropType,
+    LayoutChangeEvent,
+    SafeAreaView,
+    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
+    Gesture,
+    GestureDetector,
+    GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
+    runOnJS,
+    useAnimatedStyle,
+    useSharedValue,
 } from 'react-native-reanimated';
 
-// --- Impor Fungsi dan Hook Baru ---
+// --- Impor Fungsi dan Hook ---
 import {
-  getDesignFonts,
-  getDesignStickers,
-  getShirtColors,
-  saveDesign,
+    getDesignFonts,
+    getDesignStickers,
+    getShirtColors,
+    saveDesign,
 } from '@/lib/appwrite';
 import { useGlobalContext } from '@/lib/global-provider';
 import { useAppwrite } from '@/lib/useAppwrite';
 import { router } from 'expo-router';
 
-// --- ASET STATIS ---
+// --- Aset Statis ---
 const T_SHIRT_IMAGE = require('@/assets/images/baju_polos.png');
 
 // --- Tipe Data ---
@@ -135,7 +135,8 @@ const EditableElement = React.memo(
             {element.type === 'sticker' ? (
               <Image
                 source={element.value as ImageSourcePropType}
-                className="w-20 h-20"
+                // --- PERBAIKAN: Memberikan dimensi eksplisit pada stiker di kanvas ---
+                style={{ width: 80, height: 80 }}
                 resizeMode="contain"
               />
             ) : (
@@ -282,7 +283,6 @@ const ToolTab = ({
   </TouchableOpacity>
 );
 
-// --- Komponen Utama ---
 const ShirtEditorScreen = () => {
   const { user } = useGlobalContext();
   const [isSaving, setIsSaving] = useState(false);
@@ -354,10 +354,17 @@ const ShirtEditorScreen = () => {
     }
     setIsSaving(true);
     try {
+      const elementsToSave = elements.map((el) => {
+        if (el.type === 'sticker' && typeof el.value === 'object') {
+          return { ...el, value: (el.value as any).uri };
+        }
+        return el;
+      });
+
       await saveDesign({
         userId: user.$id,
         shirtColor,
-        elements,
+        elements: elementsToSave,
       });
       Alert.alert('Sukses', 'Desain Anda berhasil disimpan!');
     } catch (error: any) {
@@ -375,7 +382,6 @@ const ShirtEditorScreen = () => {
           element={activeElement}
           onUpdate={updateElement}
           onDelete={deleteElement}
-          // --- PERBAIKAN: Melakukan casting tipe data ---
           fonts={(fonts as unknown as FontAsset[]) || []}
           colors={(colors as unknown as ColorAsset[]) || []}
         />
@@ -426,7 +432,8 @@ const ShirtEditorScreen = () => {
               >
                 <Image
                   source={{ uri: sticker.imageUrl }}
-                  className="w-12 h-12"
+                  // --- PERBAIKAN UTAMA: Memberikan dimensi eksplisit pada stiker di toolbar ---
+                  style={{ width: 50, height: 50 }}
                   resizeMode="contain"
                 />
               </TouchableOpacity>
