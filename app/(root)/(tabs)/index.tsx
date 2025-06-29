@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -20,10 +20,8 @@ import { getLatestProperties, getProperties } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { useAppwrite } from "@/lib/useAppwrite";
 
-// Komponen Header dipisahkan agar lebih rapi
 const HomeHeader = ({ user }: any) => (
-  <View className="mb-6">
-    {/* Bagian Header Pengguna */}
+  <View className="px-4 mb-6">
     <View className="flex-row items-center justify-between">
       <View className="flex-row items-center gap-3">
         <Image
@@ -43,12 +41,9 @@ const HomeHeader = ({ user }: any) => (
         <Ionicons name="cart-outline" size={28} color="#191D31" />
       </TouchableOpacity>
     </View>
-
-    {/* Bagian Search Bar */}
     <Search />
   </View>
 );
-
 
 const Home = () => {
   const { user } = useGlobalContext();
@@ -93,9 +88,7 @@ const Home = () => {
         keyExtractor={(item: any) => item.$id}
         renderItem={renderRecommendationItem}
         numColumns={2}
-        // Style untuk memberi jarak antar kolom
-        columnWrapperStyle={{ gap: 16 }} 
-        // **PERBAIKAN UTAMA:** Menambahkan padding di bawah dan di samping
+        columnWrapperStyle={{ gap: 16 }}
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} 
         ListHeaderComponent={() => (
           <>
@@ -123,7 +116,8 @@ const Home = () => {
                   keyExtractor={(item: any) => item.$id}
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerClassName="flex gap-5"
+                  // **PERBAIKAN UTAMA:** Menambahkan padding dan jarak yang tepat
+                  contentContainerStyle={{ paddingHorizontal: 4, gap: 16 }} 
                 />
               )}
             </View>
