@@ -9,6 +9,7 @@ import {
     LayoutChangeEvent,
     SafeAreaView,
     ScrollView,
+    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
@@ -135,8 +136,7 @@ const EditableElement = React.memo(
             {element.type === 'sticker' ? (
               <Image
                 source={element.value as ImageSourcePropType}
-                // --- PERBAIKAN: Memberikan dimensi eksplisit pada stiker di kanvas ---
-                style={{ width: 80, height: 80 }}
+                style={styles.stickerOnCanvas}
                 resizeMode="contain"
               />
             ) : (
@@ -355,7 +355,7 @@ const ShirtEditorScreen = () => {
     setIsSaving(true);
     try {
       const elementsToSave = elements.map((el) => {
-        if (el.type === 'sticker' && typeof el.value === 'object') {
+        if (el.type === 'sticker' && typeof el.value === 'object' && el.value !== null) {
           return { ...el, value: (el.value as any).uri };
         }
         return el;
@@ -432,8 +432,7 @@ const ShirtEditorScreen = () => {
               >
                 <Image
                   source={{ uri: sticker.imageUrl }}
-                  // --- PERBAIKAN UTAMA: Memberikan dimensi eksplisit pada stiker di toolbar ---
-                  style={{ width: 50, height: 50 }}
+                  style={styles.stickerInToolbar}
                   resizeMode="contain"
                 />
               </TouchableOpacity>
@@ -554,5 +553,16 @@ const ShirtEditorScreen = () => {
     </GestureHandlerRootView>
   );
 };
+
+const styles = StyleSheet.create({
+  stickerOnCanvas: {
+    width: 80,
+    height: 80,
+  },
+  stickerInToolbar: {
+    width: 50,
+    height: 50,
+  },
+});
 
 export default ShirtEditorScreen;

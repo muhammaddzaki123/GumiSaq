@@ -506,19 +506,19 @@ export async function getDesignStickers() {
   try {
     const stickers = await databases.listDocuments(
       config.databaseId!,
-      config.designStickersCollectionId!,
+      config.designStickersCollectionId!, // Pastikan ID koleksi ini benar
       [Query.orderAsc('order')]
     );
 
-    // Ubah setiap dokumen menjadi URL gambar yang valid
+    // Langsung gunakan URL dari atribut 'imageFileId'
     return stickers.documents.map(doc => ({
       ...doc,
-      imageUrl: storage.getFilePreview(config.storageBucketId!, doc.imageFileId).href
+      imageUrl: doc.imageFileId // <-- PERBAIKAN UTAMA DI SINI
     }));
 
   } catch (error) {
     console.error("Error fetching design stickers:", error);
-    throw new Error("Gagal memuat stiker.");
+    throw new Error("Gagal memuat stiker. Pastikan koleksi dan atribut sudah benar.");
   }
 }
 
