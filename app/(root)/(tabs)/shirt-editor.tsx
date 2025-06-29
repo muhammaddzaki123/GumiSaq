@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -25,13 +25,17 @@ import Animated, {
     useAnimatedStyle,
     useSharedValue,
 } from 'react-native-reanimated';
+import ViewShot from 'react-native-view-shot';
 
-// --- Impor Fungsi dan Hook ---
+// --- Impor Fungsi, Hook, dan Appwrite ---
 import {
+    config,
     getDesignFonts,
     getDesignStickers,
     getShirtColors,
-    saveDesign,
+    ID, // ID sekarang bisa diimpor
+    saveFinishedDesign,
+    storage,
 } from '@/lib/appwrite';
 import { useGlobalContext } from '@/lib/global-provider';
 import { useAppwrite } from '@/lib/useAppwrite';
@@ -285,6 +289,7 @@ const ToolTab = ({
 
 const ShirtEditorScreen = () => {
   const { user } = useGlobalContext();
+  const viewShotRef = useRef<ViewShot>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [shirtColor, setShirtColor] = useState('#FFFFFF');
   const [elements, setElements] = useState<ElementState[]>([]);
@@ -340,39 +345,53 @@ const ShirtEditorScreen = () => {
     const { width, height } = event.nativeEvent.layout;
     setCanvasBounds({ width: width * 0.8, height: height * 0.8 });
   };
-
-  const handleSaveDesign = async () => {
+  
+  const handleCaptureAndSave = async () => {
     if (!user) {
-      Alert.alert('Perlu Login', 'Anda harus masuk untuk menyimpan desain.', [
-        { text: 'OK', onPress: () => router.push('/sign-in') },
-      ]);
-      return;
+        Alert.alert('Perlu Login', 'Anda harus masuk untuk menyimpan desain.');
+        return;
     }
-    if (elements.length === 0) {
-      Alert.alert('Desain Kosong', 'Tambahkan stiker atau teks sebelum menyimpan.');
-      return;
+    if (!viewShotRef.current?.capture) {
+        Alert.alert('Error', 'Komponen capture belum siap.');
+        return;
     }
+
     setIsSaving(true);
     try {
-      const elementsToSave = elements.map((el) => {
-        if (el.type === 'sticker' && typeof el.value === 'object' && el.value !== null) {
-          return { ...el, value: (el.value as any).uri };
-        }
-        return el;
-      });
+        const uri = await viewShotRef.current.capture();
 
-      await saveDesign({
-        userId: user.$id,
-        shirtColor,
-        elements: elementsToSave,
-      });
-      Alert.alert('Sukses', 'Desain Anda berhasil disimpan!');
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        
+        const file = {
+            name: `design-${user.$id}-${Date.now()}.png`,
+            type: 'image/png',
+            uri: uri,
+            size: blob.size,
+        } as any; 
+
+        const uploadedFile = await storage.createFile(
+            config.storageBucketId!,
+            ID.unique(),
+            file
+        );
+
+        const imageUrl = storage.getFileView(config.storageBucketId!, uploadedFile.$id).href;
+
+        const designName = `Desain Kustom - ${new Date().toLocaleDateString()}`;
+        await saveFinishedDesign(user.$id, designName, imageUrl);
+
+        Alert.alert('Sukses!', 'Desain final Anda telah disimpan.');
+        router.push('/(root)/(desaign)/my-designs');
+
     } catch (error: any) {
-      Alert.alert('Gagal Menyimpan', error.message);
+        console.error("Gagal menangkap atau menyimpan desain:", error);
+        Alert.alert('Error', error.message || 'Gagal menyelesaikan desain.');
     } finally {
-      setIsSaving(false);
+        setIsSaving(false);
     }
   };
+
 
   const renderToolOptions = () => {
     const activeElement = getActiveElement();
@@ -473,7 +492,7 @@ const ShirtEditorScreen = () => {
       <SafeAreaView className="flex-1 bg-white">
         <View className="py-4 px-4 flex-row justify-between items-center border-b border-gray-200">
           <TouchableOpacity
-            onPress={() => router.push('/my-designs')}
+            onPress={() => router.push('/(root)/(desaign)/my-designs')}
             className="p-2"
           >
             <Ionicons name="folder-outline" size={28} color="#526346" />
@@ -482,12 +501,12 @@ const ShirtEditorScreen = () => {
             Editor Baju
           </Text>
           <TouchableOpacity
-            onPress={handleSaveDesign}
+            onPress={handleCaptureAndSave}
             disabled={isSaving}
             className="p-2"
           >
             <Ionicons
-              name="save-outline"
+              name="checkmark-done-outline"
               size={28}
               color={isSaving ? '#ccc' : '#526346'}
             />
@@ -500,11 +519,15 @@ const ShirtEditorScreen = () => {
             activeOpacity={1}
             onPress={() => setActiveElementId(null)}
           >
-            <View className="flex-1 justify-center items-center">
+            {/* PERBAIKAN: Menggunakan 'style' bukan 'className' */}
+            <ViewShot 
+              ref={viewShotRef} 
+              options={{ fileName: "gumisaq-design", format: "png", quality: 0.9 }} 
+              style={styles.canvasContainer}
+            >
               <Image
                 source={T_SHIRT_IMAGE}
-                style={{ tintColor: shirtColor }}
-                className="w-4/5 h-4/5"
+                style={{ tintColor: shirtColor, width: '80%', height: '80%' }}
                 resizeMode="contain"
               />
               {elements.map((el) => (
@@ -517,7 +540,7 @@ const ShirtEditorScreen = () => {
                   canvasBounds={canvasBounds}
                 />
               ))}
-            </View>
+            </ViewShot>
           </TouchableOpacity>
         </View>
 
@@ -555,6 +578,11 @@ const ShirtEditorScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  canvasContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   stickerOnCanvas: {
     width: 80,
     height: 80,

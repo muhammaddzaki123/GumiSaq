@@ -541,7 +541,6 @@ export async function getDesignFonts() {
 
 export async function saveFinishedDesign(userId: string, name: string, imageUrl: string) {
   try {
-    // Ganti 'YOUR_FINISHED_DESIGNS_COLLECTION_ID' dengan ID koleksi Anda
     const finishedDesignsCollectionId = "68616d2f002cb7063304";
 
     await databases.createDocument(
@@ -559,3 +558,5 @@ export async function saveFinishedDesign(userId: string, name: string, imageUrl:
     throw new Error(error.message || "Gagal menyimpan gambar desain.");
   }
 }
+
+export { ID };
