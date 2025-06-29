@@ -32,6 +32,12 @@ export const config = {
   ordersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID,
   orderItemsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ORDER_ITEMS_COLLECTION_ID,
   designsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_DESIGNS_COLLECTION_ID,
+
+  //edit
+  shirtColorsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_COLORS_COLLECTION_ID,
+  designStickersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_STICKERS_COLLECTION_ID,
+  designFontsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_FONTS_COLLECTION_ID,
+
 };
 
 // Inisialisasi Klien Appwrite
@@ -469,5 +475,66 @@ export async function getSavedDesigns(userId: string) {
   } catch (error: any) {
     console.error("Error saat mengambil desain yang disimpan:", error);
     throw new Error(error.message || "Gagal mengambil desain.");
+  }
+}
+
+// =================================================================
+// FUNGSI ASET DESAIN
+// =================================================================
+
+/**
+ * Mengambil daftar warna baju dari database.
+ */
+export async function getShirtColors() {
+  try {
+    const colors = await databases.listDocuments(
+      config.databaseId!,
+      config.shirtColorsCollectionId!,
+      [Query.orderAsc('order')]
+    );
+    return colors.documents;
+  } catch (error) {
+    console.error("Error fetching shirt colors:", error);
+    throw new Error("Gagal memuat warna.");
+  }
+}
+
+/**
+ * Mengambil daftar stiker dari database.
+ */
+export async function getDesignStickers() {
+  try {
+    const stickers = await databases.listDocuments(
+      config.databaseId!,
+      config.designStickersCollectionId!,
+      [Query.orderAsc('order')]
+    );
+
+    // Ubah setiap dokumen menjadi URL gambar yang valid
+    return stickers.documents.map(doc => ({
+      ...doc,
+      imageUrl: storage.getFilePreview(config.storageBucketId!, doc.imageFileId).href
+    }));
+
+  } catch (error) {
+    console.error("Error fetching design stickers:", error);
+    throw new Error("Gagal memuat stiker.");
+  }
+}
+
+/**
+ * Mengambil daftar font dari database.
+ */
+export async function getDesignFonts() {
+  try {
+    const fonts = await databases.listDocuments(
+      config.databaseId!,
+      config.designFontsCollectionId!,
+      [Query.orderAsc('order')]
+    );
+    return fonts.documents;
+  } catch (error) {
+    console.error("Error fetching design fonts:", error);
+    throw new Error("Gagal memuat font.");
   }
 }
