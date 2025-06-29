@@ -1,7 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { Query } from 'react-native-appwrite';
 import { config, databases } from '../../../../lib/appwrite';
 import { useGlobalContext } from '../../../../lib/global-provider';
 
@@ -40,96 +39,37 @@ export default function AgentReports() {
   }, [user]);
 
   const loadStats = async () => {
-    if (!user) return;
-    
-    try {
-      // Get all products by this agent
-      const productsResponse = await databases.listDocuments(
-        config.databaseId!,
-        config.stokCollectionId!,
-        [Query.equal('agentId', user.$id)]
-      );
+  if (!user) return;
 
-      // Get all completed orders
-      const ordersResponse = await databases.listDocuments(
-        config.databaseId!,
-        config.ordersCollectionId!,
-        []
-      );
+  try {
+    // Get all orders
+    const ordersResponse = await databases.listDocuments(
+      config.databaseId!,
+      config.ordersCollectionId!,
+      []
+    );
 
-      // Get all order items
-      const orderItemsResponse = await databases.listDocuments(
-        config.databaseId!,
-        config.orderItemsCollectionId!,
-        []
-      );
+    // Filter orders by status
+    const deliveredOrders = ordersResponse.documents.filter(
+      order => order.status === 'delivered'
+    );
+    const pendingOrders = ordersResponse.documents.filter(
+      order => order.status === 'pending'
+    );
 
-      const productMap = new Map(
-        productsResponse.documents.map(product => [product.$id, product])
-      );
-
-      const orderMap = new Map(
-        ordersResponse.documents.map(order => [order.$id, order])
-      );
-
-      // Calculate product sales
-      const productSales = new Map();
-      orderItemsResponse.documents.forEach(item => {
-        const product = productMap.get(item.productId);
-        const order = orderMap.get(item.orderId);
-        
-        if (product && order && product.agentId === user.$id) {
-          const currentStats = productSales.get(item.productId) || {
-            name: product.name,
-            totalSold: 0,
-            revenue: 0
-          };
-
-          currentStats.totalSold += item.quantity;
-          currentStats.revenue += item.quantity * item.priceAtPurchase;
-          productSales.set(item.productId, currentStats);
-        }
-      });
-
-      // Calculate order statistics
-      let totalSales = 0;
-      let totalOrders = 0;
-      let completedOrders = 0;
-      let pendingOrders = 0;
-
-      ordersResponse.documents.forEach(order => {
-        const hasAgentProduct = orderItemsResponse.documents.some(item => {
-          const product = productMap.get(item.productId);
-          return item.orderId === order.$id && product && product.agentId === user.$id;
-        });
-
-        if (hasAgentProduct) {
-          totalOrders++;
-          if (order.status === 'completed') {
-            completedOrders++;
-            totalSales += order.totalAmount;
-          } else if (order.status === 'pending') {
-            pendingOrders++;
-          }
-        }
-      });
-
-      setStats({
-        totalSales,
-        totalOrders,
-        completedOrders,
-        pendingOrders,
-        totalProducts: productsResponse.documents.length,
-        topProducts: Array.from(productSales.values())
-          .sort((a, b) => b.revenue - a.revenue)
-          .slice(0, 5)
-      });
-    } catch (error) {
-      console.error('Error loading stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setStats({
+      ...stats,
+      totalOrders: ordersResponse.documents.length,
+      completedOrders: deliveredOrders.length,
+      pendingOrders: pendingOrders.length,
+      // Data lain tetap bisa diisi sesuai kebutuhan
+    });
+  } catch (error) {
+    console.error('Error loading stats:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   if (loading) {
     return (
