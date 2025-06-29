@@ -8,7 +8,6 @@ import {
   Platform,
   SafeAreaView,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -94,11 +93,11 @@ const EditableElement = React.memo(({ element, isActive, onActivate, onUpdate, c
     return (
         <GestureDetector gesture={Gesture.Simultaneous(panGesture, tapGesture)}>
             <Animated.View style={animatedStyle}>
-                <View style={[styles.elementContainer, isActive && styles.activeBorder]}>
+                <View className={`p-1 items-center justify-center ${isActive ? 'border-2 border-dashed border-blue-500 rounded-lg' : ''}`}>
                     {element.type === 'sticker' ? (
-                        <Image source={element.value as ImageSourcePropType} style={styles.stickerImage} resizeMode="contain" />
+                        <Image source={element.value as ImageSourcePropType} className="w-20 h-20" resizeMode="contain" />
                     ) : (
-                        <Text style={[styles.textElement, { color: element.color, fontFamily: element.fontFamily }]}>
+                        <Text style={[{ color: element.color, fontFamily: element.fontFamily }, {fontSize: 40, textAlign: 'center'}]}>
                             {element.value as string}
                         </Text>
                     )}
@@ -114,9 +113,8 @@ const ElementEditor = ({ element, onUpdate, onDelete }: {
     onDelete: (id: number) => void;
 }) => {
     return (
-        <View style={styles.editElementTools}>
-            {/* Kontrol Ukuran */}
-            <View style={styles.sliderContainer}>
+        <View className="px-4 py-2 space-y-3">
+            <View className="flex-row items-center space-x-2">
                 <Ionicons name="scan-outline" size={20} color="#555" />
                 <Slider
                     style={{ flex: 1 }}
@@ -129,8 +127,7 @@ const ElementEditor = ({ element, onUpdate, onDelete }: {
                     thumbTintColor="#526346"
                 />
             </View>
-            {/* Kontrol Rotasi */}
-            <View style={styles.sliderContainer}>
+            <View className="flex-row items-center space-x-2">
                 <Ionicons name="reload-outline" size={20} color="#555" />
                 <Slider
                     style={{ flex: 1 }}
@@ -143,39 +140,36 @@ const ElementEditor = ({ element, onUpdate, onDelete }: {
                     thumbTintColor="#526346"
                 />
             </View>
-             {/* Kontrol Font & Warna (khusus teks) */}
             {element.type === 'text' && (
                 <>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 5 }}>
                         {FONTS.map((font) => (
-                            <TouchableOpacity key={font.name} style={[styles.fontOption, element.fontFamily === font.family && styles.activeFont]} onPress={() => onUpdate(element.id, { fontFamily: font.family })}>
+                            <TouchableOpacity key={font.name} className={`px-4 py-2 rounded-full mx-1 ${element.fontFamily === font.family ? 'bg-primary-100' : 'bg-gray-200'}`} onPress={() => onUpdate(element.id, { fontFamily: font.family })}>
                                 <Text style={{ fontFamily: font.family, color: element.fontFamily === font.family ? 'white' : 'black' }}>{font.name}</Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolOptionsContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center' }}>
                         {COLORS.map((color) => (
-                            <TouchableOpacity key={color} style={[styles.colorSwatch, { backgroundColor: color, borderWidth: element.color === color ? 2 : 1, borderColor: element.color === color ? '#3498db' : '#EAEAEA' }]} onPress={() => onUpdate(element.id, { color })} />
+                            <TouchableOpacity key={color} style={[{ backgroundColor: color}, { borderWidth: element.color === color ? 2 : 1, borderColor: element.color === color ? '#3498db' : '#EAEAEA' }]} className="w-10 h-10 rounded-full mx-1.5" onPress={() => onUpdate(element.id, { color })} />
                         ))}
                     </ScrollView>
                 </>
             )}
-            {/* Tombol Hapus */}
-            <TouchableOpacity onPress={() => onDelete(element.id)} style={styles.deleteButton}>
+            <TouchableOpacity onPress={() => onDelete(element.id)} className="flex-row items-center justify-center p-3 bg-red-100 rounded-lg mt-2">
                 <Ionicons name="trash-outline" size={24} color="#D32F2F" />
-                <Text style={styles.deleteButtonText}>Hapus</Text>
+                <Text className="text-red-600 ml-2 font-rubik-bold">Hapus</Text>
             </TouchableOpacity>
         </View>
     );
 };
 
 const ToolTab = ({ icon, label, active, onPress }: { icon: any, label: string, active: boolean, onPress: () => void }) => (
-    <TouchableOpacity onPress={onPress} style={styles.tab}>
+    <TouchableOpacity onPress={onPress} className="items-center gap-1 flex-1">
         <Ionicons name={icon} size={24} color={active ? '#526346' : '#888'} />
-        <Text style={[styles.tabText, active && styles.activeTabText]}>{label}</Text>
+        <Text className={`font-rubik-medium text-xs ${active ? 'text-primary-100' : 'text-gray-500'}`}>{label}</Text>
     </TouchableOpacity>
 );
-
 
 // --- Komponen Utama ---
 const ShirtEditorScreen = () => {
@@ -214,51 +208,52 @@ const ShirtEditorScreen = () => {
 
     const renderToolOptions = () => {
         const activeElement = getActiveElement();
-
         if (activeElement) {
             return <ElementEditor element={activeElement} onUpdate={updateElement} onDelete={deleteElement} />;
         }
-
         switch (activeTool) {
             case 'tshirt':
                 return (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolOptionsContainer}>
-                        {COLORS.map((color) => ( <TouchableOpacity key={color} style={[styles.colorSwatch, { backgroundColor: color, borderWidth: shirtColor === color ? 2 : 1, borderColor: shirtColor === color ? '#3498db' : '#EAEAEA' }]} onPress={() => setShirtColor(color)} /> ))}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 16 }}>
+                        {COLORS.map((color) => (
+                          <TouchableOpacity key={color} style={[{ backgroundColor: color}, { borderWidth: shirtColor === color ? 2 : 1, borderColor: shirtColor === color ? '#3498db' : '#EAEAEA' }]} className="w-10 h-10 rounded-full mx-1.5" onPress={() => setShirtColor(color)} />
+                        ))}
                     </ScrollView>
                 );
             case 'sticker':
                 return (
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolOptionsContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', paddingHorizontal: 16 }}>
                         {STICKERS.map((sticker, index) => (
-                            <TouchableOpacity key={index} onPress={() => { addElement('sticker', sticker); setActiveTool('sticker'); }}>
-                                <Image source={sticker} style={styles.stickerPreview} resizeMode="contain" />
+                            <TouchableOpacity key={index} className="mx-2" onPress={() => { addElement('sticker', sticker); setActiveTool('sticker'); }}>
+                                <Image source={sticker} className="w-12 h-12" resizeMode="contain" />
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
                 );
             case 'text':
                  return (
-                    <View style={styles.textToolContainer}>
-                        <TextInput style={styles.textInput} placeholder="Ketik teks di sini..." value={textInputValue} onChangeText={setTextInputValue} />
-                        <TouchableOpacity style={styles.addButton} onPress={() => { if (textInputValue.trim()) { addElement('text', textInputValue); setTextInputValue(''); setActiveTool('text'); }}}>
+                    <View className="flex-row items-center px-4 flex-1">
+                        <TextInput className="flex-1 border border-gray-300 rounded-lg px-4 py-2 mr-2 font-rubik" placeholder="Ketik teks di sini..." value={textInputValue} onChangeText={setTextInputValue} />
+                        <TouchableOpacity className="p-2" onPress={() => { if (textInputValue.trim()) { addElement('text', textInputValue); setTextInputValue(''); setActiveTool('text'); }}}>
                             <Ionicons name="add-circle" size={28} color="#526346" />
                         </TouchableOpacity>
                     </View>
                 );
-            default:
-                return null;
+            default: return null;
         }
     };
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaView style={styles.container}>
-                <View style={styles.header}><Text style={styles.headerTitle}>Editor Baju</Text></View>
+            <SafeAreaView className="flex-1 bg-white">
+                <View className="py-4 items-center border-b border-gray-200">
+                    <Text className="text-xl font-rubik-bold text-black-300">Editor Baju</Text>
+                </View>
 
-                <View style={styles.canvasContainer} onLayout={onCanvasLayout}>
-                    <TouchableOpacity style={{flex: 1}} activeOpacity={1} onPress={() => setActiveElementId(null)}>
-                        <View style={styles.canvas}>
-                            <Image source={T_SHIRT_IMAGE} style={[styles.shirtImage, { tintColor: shirtColor }]} resizeMode="contain" />
+                <View className="flex-1 p-4 bg-gray-100" onLayout={onCanvasLayout}>
+                    <TouchableOpacity className="flex-1" activeOpacity={1} onPress={() => setActiveElementId(null)}>
+                        <View className="flex-1 justify-center items-center">
+                            <Image source={T_SHIRT_IMAGE} style={{ tintColor: shirtColor }} className="w-4/5 h-4/5" resizeMode="contain" />
                             {elements.map((el) => (
                                 <EditableElement key={el.id} element={el} isActive={el.id === activeElementId} onActivate={setActiveElementId} onUpdate={updateElement} canvasBounds={canvasBounds}/>
                             ))}
@@ -266,11 +261,13 @@ const ShirtEditorScreen = () => {
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.bottomPanel}>
-                    <View style={styles.toolOptionsArea}>{renderToolOptions()}</View>
+                <View className="bg-white border-t border-gray-200 pb-[90px] pt-2">
+                    <View className="min-h-[70px] justify-center py-1">
+                        {renderToolOptions()}
+                    </View>
                     
                     {!getActiveElement() && (
-                        <View style={styles.toolTabs}>
+                        <View className="flex-row justify-around pt-2 border-t border-gray-100">
                             <ToolTab icon="shirt-outline" label="Baju" active={activeTool === 'tshirt'} onPress={() => setActiveTool('tshirt')} />
                             <ToolTab icon="happy-outline" label="Stiker" active={activeTool === 'sticker'} onPress={() => setActiveTool('sticker')} />
                             <ToolTab icon="text" label="Teks" active={activeTool === 'text'} onPress={() => setActiveTool('text')} />
@@ -281,44 +278,5 @@ const ShirtEditorScreen = () => {
         </GestureHandlerRootView>
     );
 };
-
-
-// --- Stylesheet ---
-const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#FFFFFF' },
-    header: { paddingVertical: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEE' },
-    headerTitle: { fontSize: 20, fontFamily: 'Rubik-Bold', color: '#191D31' },
-    canvasContainer: { flex: 1, padding: 16, backgroundColor: '#F0F0F0' },
-    canvas: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'transparent' },
-    shirtImage: { width: '80%', height: '80%' },
-    elementContainer: { padding: 5, alignItems: 'center', justifyContent: 'center' },
-    activeBorder: { borderWidth: 2, borderColor: '#3498db', borderStyle: 'dashed', borderRadius: 8 },
-    stickerImage: { width: 80, height: 80 },
-    textElement: { fontSize: 40, padding: 5, textAlign: 'center' },
-    // --- PERUBAHAN UTAMA DI SINI ---
-    bottomPanel: { 
-        backgroundColor: 'white', 
-        borderTopWidth: 1, 
-        borderTopColor: '#EEE', 
-        paddingBottom: 90, // Menambahkan padding bawah untuk memberi ruang dari tab bar
-    },
-    toolOptionsArea: { minHeight: 70, justifyContent: 'center', paddingVertical: 5 },
-    toolTabs: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10, borderTopWidth: 1, borderColor: '#F5F5F5' },
-    tab: { alignItems: 'center', gap: 4, flex: 1 },
-    tabText: { fontFamily: 'Rubik-Medium', color: '#888', fontSize: 12 },
-    activeTabText: { color: '#526346' },
-    toolOptionsContainer: { paddingHorizontal: 16, alignItems: 'center' },
-    colorSwatch: { width: 40, height: 40, borderRadius: 20, marginHorizontal: 6, },
-    stickerPreview: { width: 50, height: 50, marginHorizontal: 8 },
-    fontOption: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 18, backgroundColor: '#F1F1F1', marginHorizontal: 5 },
-    activeFont: { backgroundColor: '#526346' },
-    textToolContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, flex: 1 },
-    textInput: { flex: 1, borderWidth: 1, borderColor: '#DDD', borderRadius: 8, paddingHorizontal: 15, paddingVertical: Platform.OS === 'ios' ? 12 : 8, marginRight: 10, fontFamily: 'Rubik-Regular' },
-    addButton: { padding: 8 },
-    editElementTools: { paddingHorizontal: 16, gap: 10, paddingVertical: 10 },
-    sliderContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    deleteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12, backgroundColor: '#FFF0F0', borderRadius: 8, marginTop: 10, },
-    deleteButtonText: { color: '#D32F2F', marginLeft: 8, fontFamily: 'Rubik-Bold' }
-});
 
 export default ShirtEditorScreen;
