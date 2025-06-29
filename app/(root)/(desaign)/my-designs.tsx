@@ -1,5 +1,6 @@
 import { useGlobalContext } from '@/lib/global-provider';
-import { getSavedDesigns } from '@/lib/appwrite';
+// UBAH FUNGSI YANG DIIMPOR
+import { getFinishedDesigns } from '@/lib/appwrite'; 
 import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
@@ -13,60 +14,47 @@ import {
   View,
 } from 'react-native';
 
-// Komponen untuk menampilkan preview satu desain
-type DesignItem = {
+// UBAH TIPE DATA UNTUK MENCOCOKKAN HASIL FINAL
+type FinishedDesignItem = {
   $id: string;
   $createdAt: string;
   name?: string;
-  shirtColor?: string;
-  elements?: string;
+  imageUrl: string; // Ini adalah URL gambar yang sudah jadi
 };
 
-const DesignPreviewCard = ({ item }: { item: DesignItem }) => {
-  // Parse elemen JSON dari string
-  const elements = JSON.parse(item.elements || '[]');
-
+// --- KARTU PREVIEW YANG TELAH DIDISAIN ULANG ---
+const FinishedDesignCard = ({ item }: { item: FinishedDesignItem }) => {
   return (
-    <View className="bg-white rounded-lg shadow-sm overflow-hidden mb-4">
-      <View className="p-4 bg-gray-100 justify-center items-center h-48">
-        <Image
-          source={require('@/assets/images/baju_polos.png')}
-          style={{ tintColor: item.shirtColor }}
-          className="w-32 h-32"
-          resizeMode="contain"
-        />
-        {/* Anda bisa menambahkan logika untuk merender beberapa stiker/teks di sini jika diperlukan */}
-      </View>
+    <View className="bg-white rounded-lg shadow-sm overflow-hidden mb-4 border border-gray-200">
+      {/* Tampilkan gambar langsung dari imageUrl */}
+      <Image
+        source={{ uri: item.imageUrl }}
+        className="w-full h-48 bg-gray-100"
+        resizeMode="contain"
+      />
       <View className="p-4">
         <Text className="font-rubik-bold text-lg text-black-300">
           {item.name || `Desain-${item.$id.slice(-6)}`}
         </Text>
-        <Text className="font-rubik text-sm text-gray-500 mt-1">
-          {elements.length} elemen
-        </Text>
         <Text className="font-rubik text-xs text-gray-400 mt-2">
           Dibuat pada: {new Date(item.$createdAt).toLocaleDateString()}
         </Text>
-        <TouchableOpacity className="bg-primary-100 p-3 rounded-lg mt-4 items-center">
-          <Text className="text-white font-rubik-bold">Gunakan Desain Ini</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-// Komponen utama halaman
+// --- KOMPONEN UTAMA HALAMAN ---
 const MyDesignsScreen = () => {
   const { user } = useGlobalContext();
 
-  // Mengambil data desain menggunakan custom hook
+  // --- UBAH FUNGSI YANG DIGUNAKAN DI HOOK APPWRITE ---
   const { data: designs, loading, refetch } = useAppwrite({
-    fn: () => getSavedDesigns(user!.$id),
+    fn: () => getFinishedDesigns(user!.$id),
     skip: !user,
   });
 
   if (!user) {
-    // Pengaman jika pengguna tidak login
     return (
       <View className="flex-1 justify-center items-center bg-gray-50 p-5">
         <Text className="text-xl font-rubik-bold text-center">Anda harus login untuk melihat halaman ini.</Text>
@@ -98,14 +86,15 @@ const MyDesignsScreen = () => {
         <FlatList
           data={designs}
           keyExtractor={(item) => item.$id}
-          renderItem={({ item }) => <DesignPreviewCard item={item} />}
+          // Gunakan komponen kartu yang baru
+          renderItem={({ item }) => <FinishedDesignCard item={item as unknown as FinishedDesignItem} />} 
           contentContainerStyle={{ padding: 16 }}
           ListEmptyComponent={() => (
             <View className="flex-1 justify-center items-center mt-20">
               <Ionicons name="color-palette-outline" size={80} color="#CBD5E0" />
               <Text className="text-xl font-rubik-bold text-gray-500 mt-4">Belum Ada Desain</Text>
               <Text className="text-base text-gray-400 mt-2 text-center">
-                Mulai buat desain di editor baju untuk menyimpannya di sini.
+                Buat dan finalisasi desain di editor baju untuk menyimpannya di sini.
               </Text>
             </View>
           )}

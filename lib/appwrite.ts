@@ -37,6 +37,7 @@ export const config = {
   shirtColorsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_COLORS_COLLECTION_ID,
   designStickersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_STICKERS_COLLECTION_ID,
   designFontsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_FONTS_COLLECTION_ID,
+   finishedDesignsCollectionId: "68616d2f002cb7063304",
 
 };
 
@@ -560,3 +561,20 @@ export async function saveFinishedDesign(userId: string, name: string, imageUrl:
 }
 
 export { ID };
+
+export async function getFinishedDesigns(userId: string) {
+  try {
+    if (!config.finishedDesignsCollectionId) {
+      throw new Error("ID Koleksi Desain Final belum diatur.");
+    }
+    const designs = await databases.listDocuments(
+      config.databaseId!,
+      config.finishedDesignsCollectionId, // Gunakan ID koleksi yang baru
+      [Query.equal("userId", userId), Query.orderDesc("$createdAt")]
+    );
+    return designs.documents;
+  } catch (error: any) {
+    console.error("Error saat mengambil desain final:", error);
+    throw new Error(error.message || "Gagal mengambil desain final.");
+  }
+}
