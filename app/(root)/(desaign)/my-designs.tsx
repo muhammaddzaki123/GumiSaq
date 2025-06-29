@@ -1,5 +1,5 @@
 import { useGlobalContext } from '@/lib/global-provider';
-import { getFinishedDesigns, addCustomDesignToCart } from '@/lib/appwrite'; 
+import { getFinishedDesigns, addCustomDesignDirectlyToCart } from '@/lib/appwrite';
 import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, router } from 'expo-router';
@@ -22,52 +22,46 @@ interface FinishedDesignItem extends Models.Document {
   shirtColor: string; 
 };
 
-// --- Komponen Kartu yang Diperbarui ---
 const FinishedDesignCard = ({ item }: { item: FinishedDesignItem }) => {
   const { user } = useGlobalContext();
   const [isAdding, setIsAdding] = useState(false);
 
-  // Fungsi untuk menghitung harga
   const calculatePrice = () => {
     try {
       const elements = JSON.parse(item.designData);
       const stickerCount = elements.filter((el: any) => el.type === 'sticker').length;
       return 30000 + stickerCount * 15000;
     } catch (e) {
-      return 30000; // Harga dasar jika gagal parsing
+      return 30000;
     }
   };
-
   const price = calculatePrice();
-  
+
   const handleEdit = () => {
     router.push({
       pathname: '/(root)/(tabs)/shirt-editor',
-      params: {
-        designData: item.designData,
-        shirtColor: item.shirtColor,
-      }
+      params: { designData: item.designData, shirtColor: item.shirtColor },
     });
   };
 
   const handleAddToCart = async () => {
     if (!user) {
-        Alert.alert("Login Diperlukan", "Anda harus masuk untuk menambahkan item.");
-        return;
+      Alert.alert("Login Diperlukan", "Anda harus masuk untuk menambahkan item.");
+      return;
     }
     
     setIsAdding(true);
     try {
-        await addCustomDesignToCart(user.$id, {
-            name: item.name || `Desain Kustom #${item.$id.slice(-6)}`,
-            imageUrl: item.imageUrl,
-            designData: item.designData,
-        });
-        Alert.alert("Sukses", "Desain berhasil ditambahkan ke keranjang!");
+      await addCustomDesignDirectlyToCart(user.$id, {
+        name: item.name || `Desain Kustom #${item.$id.slice(-6)}`,
+        imageUrl: item.imageUrl,
+        price: price,
+      });
+      Alert.alert("Sukses", "Desain berhasil ditambahkan ke keranjang!");
     } catch (error: any) {
-        Alert.alert("Error", error.message);
+      Alert.alert("Error", error.message);
     } finally {
-        setIsAdding(false);
+      setIsAdding(false);
     }
   };
 
@@ -89,38 +83,35 @@ const FinishedDesignCard = ({ item }: { item: FinishedDesignItem }) => {
           Dibuat pada: {new Date(item.$createdAt).toLocaleDateString()}
         </Text>
         
-        {/* Grup Tombol Aksi */}
         <View className="mt-4 space-y-2">
-            <TouchableOpacity 
-              onPress={handleEdit}
-              className="bg-gray-200 p-3 rounded-lg items-center flex-row justify-center"
-            >
-              <Ionicons name="create-outline" size={18} color="#333" />
-              <Text className="text-black font-rubik-bold ml-2">Edit Desain</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              onPress={handleAddToCart}
-              disabled={isAdding}
-              className={`p-3 rounded-lg items-center flex-row justify-center ${isAdding ? 'bg-gray-400' : 'bg-primary-100'}`}
-            >
-              {isAdding ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <>
-                  <Ionicons name="cart-outline" size={18} color="white" />
-                  <Text className="text-white font-rubik-bold ml-2">Tambah ke Keranjang</Text>
-                </>
-              )}
-            </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleEdit}
+            className="bg-gray-200 p-3 rounded-lg items-center flex-row justify-center"
+          >
+            <Ionicons name="create-outline" size={18} color="#333" />
+            <Text className="text-black font-rubik-bold ml-2">Edit Desain</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={handleAddToCart}
+            disabled={isAdding}
+            className={`p-3 rounded-lg items-center flex-row justify-center ${isAdding ? 'bg-gray-400' : 'bg-primary-100'}`}
+          >
+            {isAdding ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Ionicons name="cart-outline" size={18} color="white" />
+                <Text className="text-white font-rubik-bold ml-2">Tambah ke Keranjang</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
     </View>
   );
 };
 
-
-// --- Komponen Utama Halaman (tetap sama) ---
+// ... Komponen MyDesignsScreen tetap sama
 const MyDesignsScreen = () => {
   const { user } = useGlobalContext();
 
@@ -175,5 +166,4 @@ const MyDesignsScreen = () => {
     </View>
   );
 };
-
 export default MyDesignsScreen;

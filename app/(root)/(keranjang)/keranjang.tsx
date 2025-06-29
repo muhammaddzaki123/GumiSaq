@@ -1,9 +1,9 @@
-import { config, databases, getCartItems, getPropertyById } from "@/lib/appwrite";
+import { config, databases, getCartItems } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { useAppwrite } from "@/lib/useAppwrite";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect } from "expo-router"; // Import useFocusEffect
+import React, { useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,8 +17,14 @@ import {
 import { Models } from "react-native-appwrite";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+// Tipe ini sekarang akan menerima produk "virtual" dari getCartItems
 interface MergedCartItem extends Models.Document {
-  product: Models.Document | null;
+  product: {
+    $id: string;
+    name: string;
+    image: string;
+    price: number;
+  };
 }
 
 const KeranjangItemCard = ({ item, refetchCart }: { item: MergedCartItem, refetchCart: () => void }) => {
@@ -66,7 +72,7 @@ const KeranjangItemCard = ({ item, refetchCart }: { item: MergedCartItem, refetc
       <View style={styles.cardDetails}>
         <View>
           <Text style={styles.cardTitle} numberOfLines={2}>{product.name}</Text>
-          <Text style={styles.cardPrice}>Rp.{product.price}</Text>
+          <Text style={styles.cardPrice}>Rp {product.price.toLocaleString('id-ID')}</Text>
         </View>
         <View style={styles.quantityContainer}>
           <TouchableOpacity onPress={() => updateQuantity(item.quantity - 1)} style={styles.quantityButton}>
@@ -87,37 +93,31 @@ const KeranjangItemCard = ({ item, refetchCart }: { item: MergedCartItem, refetc
 
 const KeranjangScreen = () => {
   const { user } = useGlobalContext();
-  const [mergedData, setMergedData] = useState<MergedCartItem[]>([]);
   
+  // PERBAIKAN UTAMA: Kita sekarang hanya butuh satu hook useAppwrite
+  // Data yang dikembalikan sudah berisi detail produk, baik standar maupun kustom.
   const { data: cartItems, loading, refetch } = useAppwrite({
     fn: () => getCartItems(user!.$id),
     skip: !user,
   });
 
-  useEffect(() => { user && refetch() }, [user]);
-
-  useEffect(() => {
-    const mergeData = async () => {
-      if (!cartItems) {
-        setMergedData([]);
-        return;
+  // Memastikan keranjang di-refresh saat halaman menjadi fokus
+  useFocusEffect(
+    React.useCallback(() => {
+      if(user) {
+        refetch();
       }
-      const promises = cartItems.map(async (cartItem) => {
-        const product = await getPropertyById({ id: cartItem.productId });
-        return { ...cartItem, product };
-      });
-      const results = await Promise.all(promises);
-      setMergedData(results.filter(item => item.product));
-    };
-    mergeData();
-  }, [cartItems]);
+    }, [user])
+  );
 
+  // Hitung total harga langsung dari data yang sudah digabung
   const totalHarga = useMemo(() => {
-    return mergedData.reduce((sum, item) => {
+    if (!cartItems) return 0;
+    return (cartItems as MergedCartItem[]).reduce((sum, item) => {
       const price = item.product?.price || 0;
       return sum + (price * item.quantity);
     }, 0);
-  }, [mergedData]);
+  }, [cartItems]);
 
   if (!user) {
     return (
@@ -142,9 +142,9 @@ const KeranjangScreen = () => {
         <View style={{ width: 44 }} />
       </View>
 
-      {loading && mergedData.length === 0 ? (
+      {loading && (!cartItems || cartItems.length === 0) ? (
         <View style={styles.fullCenter}><ActivityIndicator size="large" color="#526346" /></View>
-      ) : mergedData.length === 0 ? (
+      ) : cartItems && cartItems.length === 0 ? (
         <View style={styles.fullCenter}>
           <Image source={require('@/assets/images/noResult.jpg')} style={styles.emptyImage} resizeMode="contain" />
           <Text style={styles.emptyTitle}>Keranjang Anda Kosong</Text>
@@ -155,21 +155,20 @@ const KeranjangScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={mergedData}
-          keyExtractor={(item) => item.$id}
+          data={cartItems as MergedCartItem[]}
+          keyExtractor={(item) => item.product.$id}
           renderItem={({ item }) => <KeranjangItemCard item={item} refetchCart={refetch} />}
           contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 150 }}
           showsVerticalScrollIndicator={false}
         />
       )}
 
-      {mergedData.length > 0 && (
+      {cartItems && cartItems.length > 0 && (
          <View style={styles.footer}>
             <View style={styles.totalContainer}>
                 <Text style={styles.totalLabel}>Total Harga</Text>
-                <Text style={styles.totalPrice}>Rp.{totalHarga.toFixed(2)}</Text>
+                <Text style={styles.totalPrice}>Rp {totalHarga.toLocaleString('id-ID')}</Text>
             </View>
-            {/* --- UBAH TOMBOL INI --- */}
             <TouchableOpacity 
               onPress={() => router.push({ pathname: '/checkout', params: { total: totalHarga } })} 
               style={[styles.primaryButton, { marginTop: 16, width: '100%' }]}
@@ -182,39 +181,40 @@ const KeranjangScreen = () => {
   );
 };
 
+// ... (Styles tetap sama)
 const styles = StyleSheet.create({
-  cardContainer: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 12,
-    marginVertical: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardImage: { width: 90, height: 90, borderRadius: 12 },
-  cardDetails: { flex: 1, marginLeft: 16, justifyContent: 'space-between' },
-  cardTitle: { fontSize: 16, fontFamily: 'Rubik-Bold', color: '#191D31' },
-  cardPrice: { fontSize: 18, fontFamily: 'Rubik-Bold', color: '#526346', marginTop: 4 },
-  quantityContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F1F1', borderRadius: 99 },
-  quantityButton: { padding: 8 },
-  quantityText: { fontSize: 16, fontFamily: 'Rubik-Medium', marginHorizontal: 12 },
-  deleteButton: { position: 'absolute', top: 8, right: 8, padding: 4 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 12, backgroundColor: 'white' },
-  headerTitle: { fontSize: 22, fontFamily: 'Rubik-ExtraBold', color: '#191D31' },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'white', padding: 20, paddingTop: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: '#EEE' },
-  totalContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 16, fontFamily: 'Rubik-Medium', color: '#666' },
-  totalPrice: { fontSize: 24, fontFamily: 'Rubik-Bold', color: '#526346' },
-  primaryButton: { backgroundColor: '#526346', paddingVertical: 16, borderRadius: 99, alignItems: 'center' },
-  primaryButtonText: { color: 'white', fontSize: 16, fontFamily: 'Rubik-Bold' },
-  fullCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FA', padding: 20 },
-  emptyImage: { width: 200, height: 200, opacity: 0.8 },
-  emptyTitle: { fontSize: 20, fontFamily: 'Rubik-Bold', color: '#333', marginTop: 16 },
-  emptySubtitle: { fontSize: 16, color: '#666', marginTop: 8, textAlign: 'center' }
-});
+    cardContainer: {
+      flexDirection: 'row',
+      backgroundColor: 'white',
+      borderRadius: 16,
+      padding: 12,
+      marginVertical: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    cardImage: { width: 90, height: 90, borderRadius: 12 },
+    cardDetails: { flex: 1, marginLeft: 16, justifyContent: 'space-between' },
+    cardTitle: { fontSize: 16, fontFamily: 'Rubik-Bold', color: '#191D31' },
+    cardPrice: { fontSize: 18, fontFamily: 'Rubik-Bold', color: '#526346', marginTop: 4 },
+    quantityContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F1F1', borderRadius: 99 },
+    quantityButton: { padding: 8 },
+    quantityText: { fontSize: 16, fontFamily: 'Rubik-Medium', marginHorizontal: 12 },
+    deleteButton: { position: 'absolute', top: 8, right: 8, padding: 4 },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingVertical: 12, backgroundColor: 'white' },
+    headerTitle: { fontSize: 22, fontFamily: 'Rubik-ExtraBold', color: '#191D31' },
+    footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'white', padding: 20, paddingTop: 16, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: '#EEE' },
+    totalContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    totalLabel: { fontSize: 16, fontFamily: 'Rubik-Medium', color: '#666' },
+    totalPrice: { fontSize: 24, fontFamily: 'Rubik-Bold', color: '#526346' },
+    primaryButton: { backgroundColor: '#526346', paddingVertical: 16, borderRadius: 99, alignItems: 'center' },
+    primaryButtonText: { color: 'white', fontSize: 16, fontFamily: 'Rubik-Bold' },
+    fullCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FA', padding: 20 },
+    emptyImage: { width: 200, height: 200, opacity: 0.8 },
+    emptyTitle: { fontSize: 20, fontFamily: 'Rubik-Bold', color: '#333', marginTop: 16 },
+    emptySubtitle: { fontSize: 16, color: '#666', marginTop: 8, textAlign: 'center' }
+  });
 
 export default KeranjangScreen;
