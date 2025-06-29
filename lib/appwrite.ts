@@ -31,13 +31,12 @@ export const config = {
   keranjangCollectionId: process.env.EXPO_PUBLIC_APPWRITE_KERANJANG_COLLECTION_ID,
   ordersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ORDERS_COLLECTION_ID,
   orderItemsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_ORDER_ITEMS_COLLECTION_ID,
-  designsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_DESIGNS_COLLECTION_ID,
 
   //edit
   shirtColorsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_COLORS_COLLECTION_ID,
   designStickersCollectionId: process.env.EXPO_PUBLIC_APPWRITE_STICKERS_COLLECTION_ID,
   designFontsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_FONTS_COLLECTION_ID,
-   finishedDesignsCollectionId: "68616d2f002cb7063304",
+  finishedDesignsCollectionId: "68616d2f002cb7063304",
 
 };
 
@@ -426,59 +425,6 @@ export async function registerAsAgent(userId: string, agentData: { storeName: st
 // FUNGSI DESAIN BAJU (SHIRT DESIGNS)
 // =================================================================
 
-/**
- * Menyimpan data desain baju baru ke database.
- * @param designData Objek yang berisi data desain.
- * @returns 
- */
-export async function saveDesign(designData: {
-  userId: string;
-  shirtColor: string;
-  elements: any[];
-  name?: string;
-}) {
-  try {
-    // Pastikan ID koleksi desain sudah ada di konfigurasi Anda
-    if (!config.designsCollectionId) {
-      throw new Error("ID Koleksi Desain (designsCollectionId) belum diatur di env.");
-    }
-
-    const newDesign = await databases.createDocument(
-      config.databaseId!,
-      config.designsCollectionId, // Gunakan ID koleksi yang baru
-      ID.unique(),
-      {
-        userId: designData.userId,
-        shirtColor: designData.shirtColor,
-        // Konversi array elemen menjadi string JSON untuk disimpan
-        elements: JSON.stringify(designData.elements),
-        name: designData.name || `Desain-${new Date().toLocaleTimeString()}`
-      }
-    );
-    return newDesign;
-  } catch (error: any) {
-    console.error("Error saat menyimpan desain:", error);
-    throw new Error(error.message || "Gagal menyimpan desain.");
-  }
-}
-
-export async function getSavedDesigns(userId: string) {
-  try {
-    if (!config.designsCollectionId) {
-      throw new Error("ID Koleksi Desain (designsCollectionId) belum diatur di env.");
-    }
-    const designs = await databases.listDocuments(
-      config.databaseId!,
-      config.designsCollectionId,
-      [Query.equal("userId", userId), Query.orderDesc("$createdAt")]
-    );
-    return designs.documents;
-  } catch (error: any) {
-    console.error("Error saat mengambil desain yang disimpan:", error);
-    throw new Error(error.message || "Gagal mengambil desain.");
-  }
-}
-
 // =================================================================
 // FUNGSI ASET DESAIN
 // =================================================================
@@ -540,18 +486,28 @@ export async function getDesignFonts() {
   }
 }
 
-export async function saveFinishedDesign(userId: string, name: string, imageUrl: string) {
+export async function saveFinishedDesign(
+    userId: string, 
+    name: string, 
+    imageUrl: string,
+    designData: string, // Tambahkan parameter ini
+    shirtColor: string   // Tambahkan parameter ini
+) {
   try {
-    const finishedDesignsCollectionId = "68616d2f002cb7063304";
+    if (!config.finishedDesignsCollectionId) {
+      throw new Error("ID Koleksi Desain Final belum diatur.");
+    }
 
     await databases.createDocument(
       config.databaseId!,
-      finishedDesignsCollectionId,
+      config.finishedDesignsCollectionId,
       ID.unique(),
       {
         userId,
         name,
         imageUrl,
+        designData, // Simpan data JSON
+        shirtColor, // Simpan warna kaos
       }
     );
   } catch (error: any) {
@@ -569,7 +525,7 @@ export async function getFinishedDesigns(userId: string) {
     }
     const designs = await databases.listDocuments(
       config.databaseId!,
-      config.finishedDesignsCollectionId, // Gunakan ID koleksi yang baru
+      config.finishedDesignsCollectionId,
       [Query.equal("userId", userId), Query.orderDesc("$createdAt")]
     );
     return designs.documents;
@@ -578,3 +534,4 @@ export async function getFinishedDesigns(userId: string) {
     throw new Error(error.message || "Gagal mengambil desain final.");
   }
 }
+

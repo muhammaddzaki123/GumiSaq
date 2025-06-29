@@ -1,50 +1,47 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import React, { useCallback, useRef, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ImageSourcePropType,
-    LayoutChangeEvent,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ImageSourcePropType,
+  LayoutChangeEvent,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import {
-    Gesture,
-    GestureDetector,
-    GestureHandlerRootView,
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
 } from 'react-native-gesture-handler';
 import Animated, {
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
 } from 'react-native-reanimated';
 import ViewShot from 'react-native-view-shot';
 
-// --- Impor Fungsi, Hook, dan Appwrite ---
 import {
-    config,
-    getDesignFonts,
-    getDesignStickers,
-    getShirtColors,
-    ID, // ID sekarang bisa diimpor
-    saveFinishedDesign,
-    storage,
+  config,
+  getDesignFonts,
+  getDesignStickers,
+  getShirtColors,
+  ID,
+  saveFinishedDesign,
+  storage,
 } from '@/lib/appwrite';
 import { useGlobalContext } from '@/lib/global-provider';
 import { useAppwrite } from '@/lib/useAppwrite';
-import { router } from 'expo-router';
 
-// --- Aset Statis ---
 const T_SHIRT_IMAGE = require('@/assets/images/baju_polos.png');
 
-// --- Tipe Data ---
 interface ElementState {
   id: number;
   type: 'text' | 'sticker';
@@ -56,20 +53,10 @@ interface ElementState {
   color: string;
   fontFamily: string;
 }
+interface FontAsset { $id: string; name: string; fontFamily: string; }
+interface ColorAsset { $id: string; hexCode: string; }
 
-interface FontAsset {
-  $id: string;
-  name: string;
-  fontFamily: string;
-}
-
-interface ColorAsset {
-  $id: string;
-  hexCode: string;
-}
-
-// --- Komponen Anak ---
-
+// Komponen EditableElement dan ElementEditor tidak perlu diubah
 const EditableElement = React.memo(
   ({
     element,
@@ -159,7 +146,6 @@ const EditableElement = React.memo(
     );
   }
 );
-
 const ElementEditor = ({
   element,
   onUpdate,
@@ -263,7 +249,6 @@ const ElementEditor = ({
     </View>
   );
 };
-
 const ToolTab = ({
   icon,
   label,
@@ -287,9 +272,12 @@ const ToolTab = ({
   </TouchableOpacity>
 );
 
+
 const ShirtEditorScreen = () => {
   const { user } = useGlobalContext();
+  const params = useLocalSearchParams();
   const viewShotRef = useRef<ViewShot>(null);
+  
   const [isSaving, setIsSaving] = useState(false);
   const [shirtColor, setShirtColor] = useState('#FFFFFF');
   const [elements, setElements] = useState<ElementState[]>([]);
@@ -298,15 +286,32 @@ const ShirtEditorScreen = () => {
   const [activeTool, setActiveTool] = useState<'tshirt' | 'sticker' | 'text'>('tshirt');
   const [canvasBounds, setCanvasBounds] = useState({ width: 0, height: 0 });
 
-  const { data: colors, loading: loadingColors } = useAppwrite({
-    fn: getShirtColors,
-  });
-  const { data: stickers, loading: loadingStickers } = useAppwrite({
-    fn: getDesignStickers,
-  });
-  const { data: fonts, loading: loadingFonts } = useAppwrite({
-    fn: getDesignFonts,
-  });
+  const { data: colors, loading: loadingColors } = useAppwrite({ fn: getShirtColors });
+  const { data: stickers, loading: loadingStickers } = useAppwrite({ fn: getDesignStickers });
+  const { data: fonts, loading: loadingFonts } = useAppwrite({ fn: getDesignFonts });
+  
+  // PERBAIKAN UTAMA: Mengganti dependency array dari [params] menjadi nilai primitifnya
+  useEffect(() => {
+    const { designData, shirtColor: paramShirtColor } = params;
+    if (designData && typeof designData === 'string') {
+      try {
+        const loadedElements = JSON.parse(designData);
+        const restoredElements = loadedElements.map((el: any) => {
+            if (el.type === 'sticker' && typeof el.value === 'string') {
+                return { ...el, value: { uri: el.value } };
+            }
+            return el;
+        });
+        setElements(restoredElements);
+      } catch (e) {
+        console.error("Gagal mem-parsing data desain:", e);
+        Alert.alert("Error", "Gagal memuat data desain yang ada.");
+      }
+    }
+    if (paramShirtColor && typeof paramShirtColor === 'string') {
+        setShirtColor(paramShirtColor);
+    }
+  }, [params.designData, params.shirtColor]);
 
   const addElement = (type: 'sticker' | 'text', value: any) => {
     const newElement: ElementState = {
@@ -323,12 +328,10 @@ const ShirtEditorScreen = () => {
     setElements((prev) => [...prev, newElement]);
     setActiveElementId(newElement.id);
   };
-
   const deleteElement = (id: number) => {
     setElements((prev) => prev.filter((el) => el.id !== id));
     if (activeElementId === id) setActiveElementId(null);
   };
-
   const updateElement = useCallback(
     (id: number, updates: Partial<ElementState>) => {
       setElements((prev) =>
@@ -337,10 +340,7 @@ const ShirtEditorScreen = () => {
     },
     []
   );
-
-  const getActiveElement = () =>
-    elements.find((el) => el.id === activeElementId);
-
+  const getActiveElement = () => elements.find((el) => el.id === activeElementId);
   const onCanvasLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setCanvasBounds({ width: width * 0.8, height: height * 0.8 });
@@ -359,7 +359,6 @@ const ShirtEditorScreen = () => {
     setIsSaving(true);
     try {
         const uri = await viewShotRef.current.capture();
-
         const response = await fetch(uri);
         const blob = await response.blob();
         
@@ -370,16 +369,19 @@ const ShirtEditorScreen = () => {
             size: blob.size,
         } as any; 
 
-        const uploadedFile = await storage.createFile(
-            config.storageBucketId!,
-            ID.unique(),
-            file
-        );
-
+        const uploadedFile = await storage.createFile(config.storageBucketId!, ID.unique(), file);
         const imageUrl = storage.getFileView(config.storageBucketId!, uploadedFile.$id).href;
-
+        
+        const elementsToSave = elements.map(el => {
+            if (el.type === 'sticker' && typeof el.value === 'object' && el.value !== null) {
+                return { ...el, value: (el.value as any).uri };
+            }
+            return el;
+        });
+        const designDataJSON = JSON.stringify(elementsToSave);
         const designName = `Desain Kustom - ${new Date().toLocaleDateString()}`;
-        await saveFinishedDesign(user.$id, designName, imageUrl);
+
+        await saveFinishedDesign(user.$id, designName, imageUrl, designDataJSON, shirtColor);
 
         Alert.alert('Sukses!', 'Desain final Anda telah disimpan.');
         router.push('/(root)/(desaign)/my-designs');
@@ -519,7 +521,6 @@ const ShirtEditorScreen = () => {
             activeOpacity={1}
             onPress={() => setActiveElementId(null)}
           >
-            {/* PERBAIKAN: Menggunakan 'style' bukan 'className' */}
             <ViewShot 
               ref={viewShotRef} 
               options={{ fileName: "gumisaq-design", format: "png", quality: 0.9 }} 

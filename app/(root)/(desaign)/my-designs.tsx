@@ -1,5 +1,4 @@
 import { useGlobalContext } from '@/lib/global-provider';
-// UBAH FUNGSI YANG DIIMPOR
 import { getFinishedDesigns } from '@/lib/appwrite'; 
 import { useAppwrite } from '@/lib/useAppwrite';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,20 +12,30 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Models } from 'react-native-appwrite';
 
-// UBAH TIPE DATA UNTUK MENCOCOKKAN HASIL FINAL
-type FinishedDesignItem = {
-  $id: string;
-  $createdAt: string;
+// Tipe data ini diperbarui agar lebih kuat
+interface FinishedDesignItem extends Models.Document {
   name?: string;
-  imageUrl: string; // Ini adalah URL gambar yang sudah jadi
+  imageUrl: string; 
+  designData: string; 
+  shirtColor: string; 
 };
 
-// --- KARTU PREVIEW YANG TELAH DIDISAIN ULANG ---
 const FinishedDesignCard = ({ item }: { item: FinishedDesignItem }) => {
+
+  const handleEdit = () => {
+    router.push({
+      pathname: '/(root)/(tabs)/shirt-editor',
+      params: {
+        designData: item.designData,
+        shirtColor: item.shirtColor,
+      }
+    });
+  };
+
   return (
     <View className="bg-white rounded-lg shadow-sm overflow-hidden mb-4 border border-gray-200">
-      {/* Tampilkan gambar langsung dari imageUrl */}
       <Image
         source={{ uri: item.imageUrl }}
         className="w-full h-48 bg-gray-100"
@@ -39,17 +48,22 @@ const FinishedDesignCard = ({ item }: { item: FinishedDesignItem }) => {
         <Text className="font-rubik text-xs text-gray-400 mt-2">
           Dibuat pada: {new Date(item.$createdAt).toLocaleDateString()}
         </Text>
+        <TouchableOpacity 
+          onPress={handleEdit}
+          className="bg-primary-100 p-3 rounded-lg mt-4 items-center flex-row justify-center"
+        >
+          <Ionicons name="create-outline" size={18} color="white" />
+          <Text className="text-white font-rubik-bold ml-2">Edit Desain Ini</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-// --- KOMPONEN UTAMA HALAMAN ---
 const MyDesignsScreen = () => {
   const { user } = useGlobalContext();
 
-  // --- UBAH FUNGSI YANG DIGUNAKAN DI HOOK APPWRITE ---
-  const { data: designs, loading, refetch } = useAppwrite({
+  const { data: designs, loading } = useAppwrite({
     fn: () => getFinishedDesigns(user!.$id),
     skip: !user,
   });
@@ -68,7 +82,6 @@ const MyDesignsScreen = () => {
   return (
     <View className="flex-1 bg-gray-50">
       <Stack.Screen options={{ headerShown: false }} />
-      {/* Header Halaman */}
       <View className="flex-row items-center justify-between p-4 bg-white border-b border-gray-200">
         <TouchableOpacity onPress={() => router.back()} className="p-2">
           <Ionicons name="arrow-back" size={24} color="#191D31" />
@@ -77,17 +90,16 @@ const MyDesignsScreen = () => {
         <View className="w-10" />
       </View>
 
-      {/* Konten Halaman */}
       {loading ? (
         <View className="flex-1 justify-center items-center">
           <ActivityIndicator size="large" color="#526346" />
         </View>
       ) : (
         <FlatList
-          data={designs}
+          // PERBAIKAN: Memberikan tipe yang jelas pada data
+          data={designs as FinishedDesignItem[]}
           keyExtractor={(item) => item.$id}
-          // Gunakan komponen kartu yang baru
-          renderItem={({ item }) => <FinishedDesignCard item={item as unknown as FinishedDesignItem} />} 
+          renderItem={({ item }) => <FinishedDesignCard item={item} />} 
           contentContainerStyle={{ padding: 16 }}
           ListEmptyComponent={() => (
             <View className="flex-1 justify-center items-center mt-20">
