@@ -8,11 +8,6 @@ interface Props {
   onPress?: () => void;
 }
 
-/**
- * Fungsi untuk memformat angka menjadi format mata uang Rupiah.
- * @param value Angka yang akan diformat.
- * @returns String harga dalam format Rupiah (e.g., "Rp 100.000").
- */
 const formatRupiah = (value: number | undefined | null) => {
   if (value === null || value === undefined) {
     return 'Rp 0';
@@ -22,15 +17,16 @@ const formatRupiah = (value: number | undefined | null) => {
 
 export const FeaturedCard = ({ item, onPress }: Props) => {
   return (
+    // PERUBAHAN: Lebar disesuaikan agar tidak terlalu besar dan mudah diatur
     <TouchableOpacity
       onPress={onPress}
-      className="flex flex-col items-start w-60 h-80 relative"
+      className="flex flex-col items-start w-72 h-80 relative" // Lebar diubah dari w-60 menjadi w-72
     >
-      <Image source={{ uri: item.image }} className="size-full rounded-2xl" />
+      <Image source={{ uri: item.image }} className="w-full h-full rounded-2xl" />
 
       <Image
         source={images.cardgradient}
-        className="size-full rounded-2xl absolute bottom-0"
+        className="w-full h-full rounded-2xl absolute bottom-0"
       />
 
       <View className="flex flex-row items-center bg-white/90 px-3 py-1.5 rounded-full absolute top-5 right-5">
@@ -52,7 +48,6 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
         </Text>
 
         <View className="flex flex-row items-center justify-between w-full">
-          {/* PERUBAHAN DI SINI */}
           <Text className="text-xl font-rubik-extrabold text-white">
             {formatRupiah(item.price)}
           </Text>
@@ -69,8 +64,8 @@ export const Card = ({ item, onPress }: Props) => {
       className="flex-1 w-full mt-4 px-3 py-4 rounded-lg bg-white shadow-lg shadow-black-100/70 relative"
       onPress={onPress}
     >
-      <View className="flex flex-row items-center absolute px-2 top-5 right-5 bg-white/90 p-1 rounded-full z-50">
-        <Image source={icons.star} className="size-2.5" />
+      <View className="flex flex-row items-center absolute px-2 top-5 right-5 bg-white/90 p-1 rounded-full z-50 ">
+        <Image source={icons.star} className="size-2.5"/>
         <Text className="text-xs font-rubik-bold text-primary-300 ml-0.5">
           {item.rating}
         </Text>
@@ -79,24 +74,23 @@ export const Card = ({ item, onPress }: Props) => {
       <Image source={{ uri: item.image }} className="w-full h-40 rounded-lg" />
 
       <View className="flex flex-col mt-2">
-        <Text className="text-base font-rubik-bold text-black-300">
-          {item.name}
-        </Text>
-        <Text className="text-xs font-rubik text-black-100">
-          {item.address}
-        </Text>
-
-        <View className="flex flex-row items-center justify-between mt-2">
-          {/* PERUBAHAN DI SINI */}
-          <Text className="text-base font-rubik-bold text-primary-300">
-            {formatRupiah(item.price)}
+          <Text className="text-base font-rubik-bold text-black-300">
+            {item.name}
           </Text>
-          <Image
-            source={icons.heart}
-            className="w-5 h-5 mr-2"
-            tintColor="#191D31"
-          />
-        </View>
+          <Text className="text-xs font-rubik text-black-100">
+            {item.address}
+          </Text>
+
+          <View className="flex flex-row items-center justify-between mt-2">
+            <Text className="text-base font-rubik-bold text-primary-300">
+              {formatRupiah(item.price)}
+            </Text>
+            <Image
+              source={icons.heart}
+              className="w-5 h-5 mr-2"
+              tintColor="#191D31"
+            />
+          </View>
       </View>
     </TouchableOpacity>
   );

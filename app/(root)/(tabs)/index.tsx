@@ -22,7 +22,7 @@ import { useAppwrite } from "@/lib/useAppwrite";
 
 // Komponen Header dipisahkan agar lebih rapi
 const HomeHeader = ({ user }: any) => (
-  <View className="px-4 pt-5 space-y-6">
+  <View className="mb-6">
     {/* Bagian Header Pengguna */}
     <View className="flex-row items-center justify-between">
       <View className="flex-row items-center gap-3">
@@ -39,7 +39,7 @@ const HomeHeader = ({ user }: any) => (
           </Text>
         </View>
       </View>
-      <TouchableOpacity onPress={() => router.push('./keranjang')} className="bg-white p-3 rounded-full shadow-sm">
+      <TouchableOpacity onPress={() => router.push('/(root)/(keranjang)/keranjang')} className="bg-white p-3 rounded-full shadow-sm">
         <Ionicons name="cart-outline" size={28} color="#191D31" />
       </TouchableOpacity>
     </View>
@@ -78,48 +78,35 @@ const Home = () => {
 
   const handleCardPress = (id: string) => router.push(`/properties/${id}`);
   
-  // Render Item untuk FlatList Unggulan
   const renderFeaturedItem = ({ item }: { item: any }) => (
     <FeaturedCard item={item} onPress={() => handleCardPress(item.$id)} />
   );
 
-  // Render Item untuk FlatList Rekomendasi
   const renderRecommendationItem = ({ item }: { item: any }) => (
     <Card item={item} onPress={() => handleCardPress(item.$id)} />
   );
 
   return (
-    <SafeAreaView className="h-full bg-gray-50">
-      {/* PERUBAHAN UTAMA: 
-        - HomeHeader sekarang berada di luar FlatList, membuatnya statis.
-        - FlatList sekarang tidak lagi membungkus header, tetapi menjadi bagian dari layout.
-      */}
-      <HomeHeader user={user} />
-      
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
       <FlatList
         data={properties}
-        keyExtractor={(item) => item.$id}
+        keyExtractor={(item: any) => item.$id}
         renderItem={renderRecommendationItem}
         numColumns={2}
-        columnWrapperClassName="flex-1 gap-4 px-4"
-        contentContainerClassName="pb-32"
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={() =>
-          !propertiesLoading && <NoResults />
-        }
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#526346" />
-        }
-        // ListHeaderComponent sekarang hanya berisi bagian 'Unggulan' dan 'Rekomendasi'
+        // Style untuk memberi jarak antar kolom
+        columnWrapperStyle={{ gap: 16 }} 
+        // **PERBAIKAN UTAMA:** Menambahkan padding di bawah dan di samping
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} 
         ListHeaderComponent={() => (
-          <View className="px-4 pt-2 pb-6 space-y-6">
-             {/* Bagian Unggulan */}
-             <View>
+          <>
+            <HomeHeader user={user} />
+            
+            {/* Bagian Unggulan */}
+            <View className="mb-8">
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-2xl font-rubik-bold text-black-300">
                   Unggulan
                 </Text>
-
                 <TouchableOpacity onPress={() => router.push('/explore')}>
                   <Text className="text-base font-rubik-medium text-primary-100">
                     Lihat Semua
@@ -128,12 +115,12 @@ const Home = () => {
               </View>
 
               {latestLoading ? (
-                <ActivityIndicator size="large" className="text-primary-100 h-80" />
+                <ActivityIndicator size="large" color="#526346" />
               ) : (
                 <FlatList
                   data={latestProperties}
                   renderItem={renderFeaturedItem}
-                  keyExtractor={(item) => item.$id}
+                  keyExtractor={(item: any) => item.$id}
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerClassName="flex gap-5"
@@ -141,15 +128,21 @@ const Home = () => {
               )}
             </View>
 
-            {/* Judul Bagian Rekomendasi */}
-            <View>
+            {/* Judul Bagian Rekomendasi & Filter */}
+            <View className="mb-4">
               <Text className="text-2xl font-rubik-bold text-black-300">
                 Rekomendasi
               </Text>
               <Filters />
             </View>
-          </View>
+          </>
         )}
+        ListEmptyComponent={() => (
+          !propertiesLoading && <NoResults />
+        )}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#526346" />
+        }
       />
     </SafeAreaView>
   );

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import React, { useState, useEffect, useMemo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useGlobalContext } from "@/lib/global-provider";
 import { useAppwrite } from "@/lib/useAppwrite";
@@ -21,7 +21,6 @@ import {
 } from "@/lib/appwrite";
 import { Models } from "react-native-appwrite";
 
-// This type helps us understand the data structure we expect
 interface MergedCartItem extends Models.Document {
   product: {
     $id: string;
@@ -29,37 +28,55 @@ interface MergedCartItem extends Models.Document {
     image: string;
     price: number;
   };
+  quantity: number;
 }
 
 const CheckoutScreen = () => {
   const { user } = useGlobalContext();
+  const params = useLocalSearchParams<{ 
+    isDirectBuy?: "true",
+    productId?: string,
+    productName?: string,
+    productImage?: string,
+    productPrice?: string
+  }>();
+
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-
-  // --- DATA FETCHING ---
-  // Fetch user addresses
+  
   const { data: addresses, refetch: refetchAddresses } = useAppwrite({
     fn: () => getUserAddresses(user!.$id),
     skip: !user,
   });
 
-  // Fetch all cart items (standard and custom) using the corrected function
-  const { data: cartItems, loading: cartLoading } = useAppwrite({
+  // Hanya ambil data keranjang jika BUKAN pembelian langsung
+  const { data: cartItemsData, loading: cartLoading } = useAppwrite({
     fn: () => getCartItems(user!.$id),
-    skip: !user,
+    skip: !user || !!params.isDirectBuy,
   });
 
-  // --- EFFECTS ---
-  // Refetch address when the page is focused
+  const cartItems = useMemo(() => {
+    if (params.isDirectBuy) {
+      return [{
+        product: {
+          $id: params.productId!,
+          name: params.productName!,
+          image: params.productImage!,
+          price: parseFloat(params.productPrice || '0'),
+        },
+        quantity: 1,
+        isCustom: false, // Tandai ini bukan kustom
+      }];
+    }
+    return cartItemsData as MergedCartItem[];
+  }, [params, cartItemsData]);
+
   useFocusEffect(
     React.useCallback(() => {
-      if (user) {
-        refetchAddresses();
-      }
+      if (user) { refetchAddresses(); }
     }, [user])
   );
 
-  // Set the default selected address
   useEffect(() => {
     if (addresses && addresses.length > 0 && !selectedAddress) {
       setSelectedAddress(addresses[0].detail);
@@ -68,27 +85,18 @@ const CheckoutScreen = () => {
     }
   }, [addresses]);
 
-
-  // --- CALCULATIONS ---
-  // Calculate totals directly from the fetched cart items
   const { subtotal, biayaPengiriman, grandTotal } = useMemo(() => {
-    if (!cartItems) return { subtotal: 0, biayaPengiriman: 0, grandTotal: 0 };
+    if (!cartItems || cartItems.length === 0) return { subtotal: 0, biayaPengiriman: 0, grandTotal: 0 };
     
-    const sub = (cartItems as MergedCartItem[]).reduce((sum, item) => {
+    const sub = cartItems.reduce((sum, item) => {
       const price = item.product?.price || 0;
-      return sum + price * item.quantity;
+      return sum + (price * item.quantity);
     }, 0);
 
-    const shipping = sub > 0 ? 10000 : 0; // Or your shipping logic
-    return {
-      subtotal: sub,
-      biayaPengiriman: shipping,
-      grandTotal: sub + shipping,
-    };
+    const shipping = sub > 0 ? 10000 : 0;
+    return { subtotal: sub, biayaPengiriman: shipping, grandTotal: sub + shipping };
   }, [cartItems]);
 
-
-  // --- HANDLERS ---
   const handlePlaceOrder = async () => {
     if (!user) {
       Alert.alert("Error", "Sesi Anda berakhir, silakan masuk kembali.");
@@ -99,14 +107,10 @@ const CheckoutScreen = () => {
       Alert.alert("Alamat Kosong", "Pilih atau tambahkan alamat pengiriman.");
       return;
     }
-    if (!cartItems || cartItems.length === 0) {
-      Alert.alert("Keranjang Kosong", "Tidak ada item untuk di-checkout.");
-      return;
-    }
 
     setIsPlacingOrder(true);
     try {
-      const orderId = await createOrder(user.$id, selectedAddress, grandTotal, cartItems as any[]);
+      const orderId = await createOrder(user.$id, selectedAddress, grandTotal, cartItems);
       router.replace({ pathname: "/order-confirmation", params: { orderId } });
     } catch (error: any) {
       Alert.alert("Gagal Membuat Pesanan", error.message);
@@ -117,6 +121,7 @@ const CheckoutScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* ... (UI Header tetap sama) ... */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
           <Ionicons name="arrow-back" size={28} color="#191D31" />
@@ -126,36 +131,36 @@ const CheckoutScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 180 }}>
+        {/* ... (UI Alamat Pengiriman tetap sama) ... */}
         <View style={{ paddingHorizontal: 20 }}>
-          {/* Alamat Pengiriman */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Alamat Pengiriman</Text>
-            <TouchableOpacity
-              style={styles.addressBox}
-              onPress={() => router.push({ pathname: "/address-manager", params: { fromCheckout: 'true' } })}
-            >
-              <Ionicons name="location-outline" size={32} color="#526346" style={{ marginRight: 16 }} />
-              <View style={{ flex: 1 }}>
-                {selectedAddress ? (
-                  <>
-                    <Text style={styles.addressName}>{user?.name}</Text>
-                    <Text style={styles.addressText} numberOfLines={2}>{selectedAddress}</Text>
-                  </>
-                ) : (
-                  <Text style={styles.addressText}>
-                    Belum ada alamat. Ketuk untuk menambah.
-                  </Text>
-                )}
-              </View>
-              <Ionicons name="chevron-forward" size={24} color="#888" />
-            </TouchableOpacity>
-          </View>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Alamat Pengiriman</Text>
+              <TouchableOpacity
+                style={styles.addressBox}
+                onPress={() => router.push({ pathname: "/address-manager", params: { fromCheckout: 'true' } })}
+              >
+                <Ionicons name="location-outline" size={32} color="#526346" style={{ marginRight: 16 }} />
+                <View style={{ flex: 1 }}>
+                  {selectedAddress ? (
+                    <>
+                      <Text style={styles.addressName}>{user?.name}</Text>
+                      <Text style={styles.addressText} numberOfLines={2}>{selectedAddress}</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.addressText}>
+                      Belum ada alamat. Ketuk untuk menambah.
+                    </Text>
+                  )}
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#888" />
+              </TouchableOpacity>
+            </View>
 
           {/* Ringkasan Item */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Ringkasan Pesanan</Text>
-            {cartLoading ? <ActivityIndicator/> : (
-                (cartItems as MergedCartItem[])?.map(item => (
+            {cartLoading && !params.isDirectBuy? <ActivityIndicator/> : (
+                cartItems?.map(item => (
                     <View key={item.product.$id} style={styles.itemCard}>
                         <Image source={{ uri: item.product.image }} style={styles.itemImage} />
                         <View style={styles.itemDetails}>
@@ -167,29 +172,28 @@ const CheckoutScreen = () => {
                 ))
             )}
           </View>
-
-
-          {/* Rincian Pembayaran */}
+          {/* ... (UI Rincian Pembayaran tetap sama) ... */}
           <View style={[styles.section, { backgroundColor: 'white', padding: 20, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 }]}>
-            <Text style={styles.sectionTitle}>Rincian Pembayaran</Text>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal</Text>
-              <Text style={styles.summaryValue}>Rp {subtotal.toLocaleString('id-ID')}</Text>
+              <Text style={styles.sectionTitle}>Rincian Pembayaran</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryValue}>Rp {subtotal.toLocaleString('id-ID')}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Biaya Pengiriman</Text>
+                <Text style={styles.summaryValue}>Rp {biayaPengiriman.toLocaleString('id-ID')}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { fontFamily: 'Rubik-Bold' }]}>Total</Text>
+                <Text style={[styles.summaryValue, { fontFamily: 'Rubik-Bold', fontSize: 18, color: '#526346' }]}>Rp {grandTotal.toLocaleString('id-ID')}</Text>
+              </View>
             </View>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Biaya Pengiriman</Text>
-              <Text style={styles.summaryValue}>Rp {biayaPengiriman.toLocaleString('id-ID')}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { fontFamily: 'Rubik-Bold' }]}>Total</Text>
-              <Text style={[styles.summaryValue, { fontFamily: 'Rubik-Bold', fontSize: 18, color: '#526346' }]}>Rp {grandTotal.toLocaleString('id-ID')}</Text>
-            </View>
-          </View>
         </View>
       </ScrollView>
 
-      <View style={styles.footer}>
+       {/* ... (UI Footer tetap sama) ... */}
+       <View style={styles.footer}>
         <TouchableOpacity
           onPress={handlePlaceOrder}
           style={[styles.primaryButton, (isPlacingOrder || !cartItems || cartItems.length === 0) && { backgroundColor: '#AAB1A5' }]}
@@ -206,7 +210,7 @@ const CheckoutScreen = () => {
   );
 };
 
-// ... Styles (Salin style dari file checkout Anda yang lama)
+// ... (Styles tetap sama)
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
@@ -267,6 +271,5 @@ const styles = StyleSheet.create({
     },
     primaryButtonText: { color: 'white', fontSize: 16, fontFamily: 'Rubik-Bold' }
   });
-  
 
 export default CheckoutScreen;

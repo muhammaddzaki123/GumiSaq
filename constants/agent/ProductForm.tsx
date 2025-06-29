@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
@@ -26,7 +27,10 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
   
   const { user } = useGlobalContext();
 
-  const handleImagePick = async (setImageFunc: React.Dispatch<React.SetStateAction<any>>, multiple = false) => {
+  const handleImagePick = async (
+    setImageFunc: React.Dispatch<React.SetStateAction<any>>, 
+    options: { multiple: boolean }
+  ) => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
       Alert.alert("Izin Diperlukan", "Anda perlu memberikan izin untuk mengakses galeri foto.");
@@ -34,18 +38,19 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'Images' as any,
-      allowsEditing: !multiple,
-      allowsMultipleSelection: multiple,
-      aspect: [4, 3],
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: !options.multiple,
+      // **PERUBAHAN UTAMA:** Izinkan pemilihan ganda jika `multiple` adalah true
+      allowsMultipleSelection: options.multiple, 
       quality: 1,
     });
 
     if (!result.canceled) {
-      if (multiple) {
+      if (options.multiple && result.assets) {
         const newUris = result.assets.map(asset => asset.uri);
-        setImageFunc((prevUris: string[]) => [...prevUris, ...newUris]);
-      } else {
+        // Tambahkan gambar baru ke state yang sudah ada
+        setImageFunc((prevUris: string[]) => [...prevUris, ...newUris]); 
+      } else if (!options.multiple && result.assets) {
         setImageFunc(result.assets[0].uri);
       }
     }
@@ -61,7 +66,7 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
         'image/avif': 'avif',
         'image/heic': 'heic',
     };
-    return map[mimeType.toLowerCase()] || null;
+    return map[mimeType.toLowerCase()] || 'jpg'; // Default ke jpg jika tidak diketahui
   };
 
   const uploadImage = async (uri: string): Promise<string> => {
@@ -69,9 +74,6 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
       const blob = await response.blob();
       
       const fileExtension = getSafeFileExtension(blob.type);
-      if (!fileExtension) {
-          throw new Error(`Tipe file ${blob.type} tidak didukung.`);
-      }
 
       const fileName = `product_image_${Date.now()}.${fileExtension}`;
       const file = { name: fileName, type: blob.type, size: blob.size, uri };
@@ -143,7 +145,7 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
       onSuccess();
     } catch (error: any) {
       console.error("Gagal menyimpan produk:", error);
-      Alert.alert('Error', error.message || 'Gagal menyimpan produk. Periksa konsol untuk detail.');
+      Alert.alert('Error', error.message || 'Gagal menyimpan produk.');
     } finally {
       setLoading(false);
     }
@@ -155,6 +157,7 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
         {mode === 'edit' ? 'Edit Produk' : 'Tambah Produk Baru'}
       </Text>
 
+      {/* Form Fields (Nama, Tipe, Harga, Deskripsi) - Tidak ada perubahan */}
       <View>
         <Text className="text-sm font-rubik-medium text-black-300 mb-1">Nama Produk</Text>
         <TextInput className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik" placeholder="Masukkan nama produk" value={name} onChangeText={setName} />
@@ -182,10 +185,18 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
         <TextInput className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik h-24" placeholder="Masukkan deskripsi" value={description} onChangeText={setDescription} multiline textAlignVertical="top" />
       </View>
 
+      {/* --- UI IMAGE PICKER BARU --- */}
       <View>
-        <Text className="text-sm font-rubik-medium text-black-300 mb-1">Gambar Utama</Text>
-        <TouchableOpacity onPress={() => handleImagePick(setMainImage, false)} className="w-full h-40 border-2 border-dashed border-gray-300 rounded-lg items-center justify-center bg-gray-50">
-          {mainImage ? <Image source={{ uri: mainImage }} className="w-full h-full rounded-lg" resizeMode="cover" /> : <Text className="text-gray-500 font-rubik">Tap untuk pilih gambar utama</Text>}
+        <Text className="text-sm font-rubik-medium text-black-300 mb-2">Gambar Utama</Text>
+        <TouchableOpacity onPress={() => handleImagePick(setMainImage, { multiple: false })} className="border border-dashed border-gray-400 p-4 rounded-xl items-center justify-center h-48 bg-gray-50">
+          {mainImage ? (
+            <Image source={{ uri: mainImage }} className="w-full h-full rounded-xl" resizeMode="cover" />
+          ) : (
+            <View className="items-center">
+              <Ionicons name="cloud-upload-outline" size={40} color="gray" />
+              <Text className="text-gray-500 mt-2">Ketuk untuk Pilih Gambar Utama</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
       
@@ -199,12 +210,12 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
                           onPress={() => setGalleryImages(prev => prev.filter((_, i) => i !== index))}
                           className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1"
                       >
-                          <Text className="text-white text-xs font-bold">X</Text>
+                         <Ionicons name="close" size={12} color="white" />
                       </TouchableOpacity>
                   </View>
               ))}
-              <TouchableOpacity onPress={() => handleImagePick(setGalleryImages, true)} className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg items-center justify-center bg-gray-50">
-                  <Text className="text-gray-500 text-3xl">+</Text>
+              <TouchableOpacity onPress={() => handleImagePick(setGalleryImages, { multiple: true })} className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg items-center justify-center bg-gray-50">
+                  <Ionicons name="add" size={30} color="gray" />
               </TouchableOpacity>
           </ScrollView>
       </View>
