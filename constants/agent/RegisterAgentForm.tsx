@@ -1,6 +1,16 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+
 import { registerAsAgent } from '../../lib/appwrite';
 import { useGlobalContext } from '../../lib/global-provider';
 
@@ -13,69 +23,139 @@ export const RegisterAgentForm = ({ onSuccess }: { onSuccess?: () => void }) => 
 
   const handleSubmit = async () => {
     if (!storeName || !phoneNumber) {
-      Alert.alert('Error', 'Semua field harus diisi');
+      Alert.alert('Error', 'Nama toko dan nomor telepon wajib diisi.');
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
       await registerAsAgent(user?.$id || '', {
         storeName,
         phoneNumber
       });
-      await refetch(); // Refresh user data to update userType
-      Alert.alert('Sukses', 'Pendaftaran agen berhasil!');
-      onSuccess?.();
-      router.push('/(root)/(agent)/dashboard');
+      await refetch(); // Refresh data pengguna untuk memperbarui userType
+      Alert.alert('Sukses', 'Pendaftaran agen berhasil! Anda akan diarahkan ke dasbor.');
+      
+      // Beri jeda singkat agar pengguna bisa membaca alert
+      setTimeout(() => {
+        onSuccess?.();
+        router.replace('/(root)/(agent)/dashboard');
+      }, 1000);
+
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Gagal mendaftar sebagai agen');
-    } finally {
+      Alert.alert('Error', error.message || 'Gagal mendaftar sebagai agen.');
       setLoading(false);
-    }
+    } 
+    // `setLoading(false)` tidak ditaruh di finally agar tombol tetap disabled setelah sukses.
   };
 
   return (
-    <View className="p-4 bg-white rounded-lg shadow-sm">
-      <Text className="text-2xl font-rubik-bold mb-4 text-black-300">
-        Daftar Sebagai Agen
+    <View style={styles.container}>
+      <Text style={styles.title}>Daftar Sebagai Agen</Text>
+      <Text style={styles.subtitle}>
+        Lengkapi detail toko Anda untuk mulai berjualan di GumiSaQ.
       </Text>
       
-      <View className="space-y-4">
-        <View>
-          <Text className="text-sm font-rubik-medium text-black-300 mb-1">
-            Nama Toko
-          </Text>
+      <View style={styles.form}>
+        <View style={styles.inputContainer}>
+          <Ionicons name="storefront-outline" size={20} color="#6B7280" style={styles.inputIcon} />
           <TextInput
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik"
-            placeholder="Masukkan nama toko"
+            style={styles.input}
+            placeholder="Nama Toko Anda"
             value={storeName}
             onChangeText={setStoreName}
+            placeholderTextColor="#6B7280"
           />
         </View>
 
-        <View>
-          <Text className="text-sm font-rubik-medium text-black-300 mb-1">
-            Nomor Telepon
-          </Text>
+        <View style={styles.inputContainer}>
+          <Ionicons name="call-outline" size={20} color="#6B7280" style={styles.inputIcon} />
           <TextInput
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik"
-            placeholder="Masukkan nomor telepon"
+            style={styles.input}
+            placeholder="Nomor Telepon (cth: 0812...)"
             value={phoneNumber}
             onChangeText={setPhoneNumber}
             keyboardType="phone-pad"
+            placeholderTextColor="#6B7280"
           />
         </View>
 
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={loading}
-          className={`w-full py-3 rounded-lg ${loading ? 'bg-gray-400' : 'bg-primary-300'}`}
+          style={[styles.button, loading && styles.buttonDisabled]}
         >
-          <Text className="text-center text-white font-rubik-bold">
-            {loading ? 'Memproses...' : 'Daftar Sekarang'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.buttonText}>Daftar Sekarang</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
   );
 };
+
+
+const styles = StyleSheet.create({
+    container: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 24,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+    },
+    title: {
+        fontSize: 24,
+        fontFamily: 'Rubik-Bold',
+        color: '#1F2937',
+        textAlign: 'center',
+    },
+    subtitle: {
+        fontSize: 14,
+        fontFamily: 'Rubik-Regular',
+        color: '#6B7280',
+        textAlign: 'center',
+        marginTop: 8,
+        marginBottom: 24,
+    },
+    form: {
+        gap: 16,
+    },
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        paddingHorizontal: 16,
+    },
+    inputIcon: {
+        marginRight: 12,
+    },
+    input: {
+        flex: 1,
+        height: 50,
+        fontSize: 16,
+        fontFamily: 'Rubik-Regular',
+        color: '#1F2937',
+    },
+    button: {
+        backgroundColor: '#526346',
+        borderRadius: 99,
+        paddingVertical: 16,
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    buttonDisabled: {
+        backgroundColor: '#A1A1AA',
+    },
+    buttonText: {
+        color: 'white',
+        fontSize: 16,
+        fontFamily: 'Rubik-Bold',
+    },
+});
