@@ -4,6 +4,7 @@ import {
   Client,
   Databases,
   ID,
+  OAuthProvider,
   Query,
   Storage,
 } from "react-native-appwrite";
@@ -56,6 +57,7 @@ export const avatars = new Avatars(client);
 export const account = new Account(client);
 export const databases = new Databases(client);
 export const storage = new Storage(client);
+export { ID };
 
 // =================================================================
 // FUNGSI OTENTIKASI & PENGGUNA (Authentication & User)
@@ -67,25 +69,23 @@ export const storage = new Storage(client);
 export async function createUser(email: string, password: string, name: string) {
   try {
     const newAccount = await account.create(ID.unique(), email, password, name);
-    if (!newAccount) throw new Error("Gagal membuat akun.");
+    if (!newAccount) throw new Error("Gagal membuat akun Appwrite.");
 
     const avatarUrl = avatars.getInitials(name);
 
-    // Saat membuat user, inisialisasi 'addresses' dengan array kosong
     await databases.createDocument(
       config.databaseId!,
       config.usersProfileCollectionId!,
       newAccount.$id,
       {
         accountId: newAccount.$id,
-        email,
-        name,
+        email: newAccount.email,
+        name: newAccount.name,
         avatar: avatarUrl.toString(),
         userType: 'user',
-        addresses: [], // Inisialisasi 'addresses' sebagai array kosong
+        addresses: [],
       }
     );
-
     return newAccount;
   } catch (error: any) {
     console.error("Error saat membuat pengguna:", error);
@@ -98,12 +98,22 @@ export async function createUser(email: string, password: string, name: string) 
  */
 export async function loginUser(email: string, password: string) {
   try {
-    // Menghapus sesi lama untuk memastikan login yang bersih
     await account.deleteSession("current").catch(() => {});
     return await account.createEmailPasswordSession(email, password);
   } catch (error: any) {
     console.error("Error saat proses login:", error);
     throw new Error(error.message || "Email atau password salah.");
+  }
+}
+
+export async function signInWithGoogle() {
+  try {
+    // Appwrite akan membuka browser. Setelah login, pengguna akan
+    // diarahkan kembali ke aplikasi melalui custom scheme.
+    await account.createOAuth2Session(OAuthProvider.Google);
+  } catch (error: any) {
+    console.error("Error saat memulai sesi Google:", error);
+    throw new Error(error.message || "Gagal memulai login dengan Google.");
   }
 }
 
@@ -115,39 +125,48 @@ export async function getCurrentUser() {
     const currentAccount = await account.get();
     if (!currentAccount) return null;
 
-    const userDoc = await databases.getDocument(
+    const userProfile = await databases.listDocuments(
       config.databaseId!,
       config.usersProfileCollectionId!,
-      currentAccount.$id
+      [Query.equal("accountId", currentAccount.$id)]
     );
+    
+    if (userProfile.documents.length > 0) {
+      return userProfile.documents[0];
+    }
+    
+    console.log("Profil pengguna tidak ditemukan, membuat profil baru...");
+    const avatarUrl = avatars.getInitials(currentAccount.name);
 
-    return {
-      $id: userDoc.$id,
-      name: userDoc.name,
-      email: userDoc.email,
-      avatar: userDoc.avatar,
-      userType: userDoc.userType as 'user' | 'admin' | 'agent',
-      alamat: userDoc.alamat,
-      noHp: userDoc.noHp || '',
-    };
+    const newUserProfile = await databases.createDocument(
+      config.databaseId!,
+      config.usersProfileCollectionId!,
+      currentAccount.$id,
+      {
+        accountId: currentAccount.$id,
+        email: currentAccount.email,
+        name: currentAccount.name,
+        avatar: avatarUrl.toString(),
+        userType: 'user',
+        addresses: [],
+      }
+    );
+    
+    return newUserProfile;
   } catch (error) {
-    console.log("Tidak ada sesi aktif atau profil pengguna tidak ditemukan.");
+    console.log("Sesi tidak ditemukan atau terjadi error:", error);
     return null;
   }
 }
 
-/**
- * Logout pengguna dengan menghapus sesi saat ini.
- */
 export async function logout() {
   try {
     return await account.deleteSession("current");
   } catch (error: any) {
-    console.error("Error saat logout:", error.message);
+    console.error("Error saat logout:", error);
     throw new Error("Gagal untuk logout.");
   }
 }
-
 // =================================================================
 // FUNGSI ARTIKEL
 // =================================================================
@@ -256,20 +275,6 @@ export async function addToCart(userId: string, productId: string) {
   }
 }
 
-// export async function getCartItems(userId: string) {
-//   try {
-//     const result = await databases.listDocuments(
-//       config.databaseId!,
-//       config.keranjangCollectionId!,
-//       [Query.equal("userId", userId), Query.orderDesc("$createdAt")]
-//     );
-//     return result.documents;
-//   } catch (error) {
-//     console.error('Error saat mengambil item keranjang:', error);
-//     return [];
-//   }
-// }
-
 // =================================================================
 // FUNGSI ALAMAT PENGGUNA (USER ADDRESS)
 // =================================================================
@@ -336,50 +341,48 @@ export async function deleteUserAddress(userId: string, addressToDelete: { label
 // FUNGSI PESANAN (ORDERS)
 // =================================================================
 
-// export async function createOrder(
-//     userId: string, 
-//     shippingAddress: string, 
-//     totalAmount: number,
-//     cartItems: any[]
-// ) {
-//     if (!cartItems || cartItems.length === 0) {
-//         throw new Error("Keranjang kosong, tidak bisa membuat pesanan.");
-//     }
+/**
+ * Fungsi createOrder juga perlu diupdate untuk menangani item kustom.
+ */
+export const createOrder = async (userId: string, shippingAddress: string, totalAmount: number, cartItems: any[]) => {
+  try {
+    const newOrder = await databases.createDocument(config.databaseId!, config.ordersCollectionId!, ID.unique(), {
+      userId,
+      shippingAddress,
+      totalAmount,
+      status: 'pending',
+    });
 
-//     try {
-//         const newOrder = await databases.createDocument(
-//             config.databaseId!,
-//             config.ordersCollectionId!,
-//             ID.unique(),
-//             { userId, shippingAddress, totalAmount, status: 'pending' }
-//         );
-//         if (!newOrder) throw new Error("Gagal membuat data pesanan.");
+    const orderItemPromises = cartItems.map((item) => {
+      return databases.createDocument(config.databaseId!, config.orderItemsCollectionId!, ID.unique(), {
+        orderId: newOrder.$id,
+        quantity: item.quantity,
+        priceAtPurchase: item.product.price,
+        productId: item.isCustom ? null : item.product.$id,
+        productName: item.product.name,
+        productImageUrl: item.product.image,
+      });
+    });
 
-//         const itemPromises = cartItems.map(item => 
-//             Promise.all([
-//                 databases.createDocument(
-//                     config.databaseId!,
-//                     config.orderItemsCollectionId!,
-//                     ID.unique(),
-//                     {
-//                         orderId: newOrder.$id,
-//                         productId: item.productId,
-//                         quantity: item.quantity,
-//                         priceAtPurchase: item.product?.price || 0
-//                     }
-//                 ),
-//                 databases.deleteDocument(config.databaseId!, config.keranjangCollectionId!, item.$id)
-//             ])
-//         );
+    await Promise.all(orderItemPromises);
+    
+    // --- PERBAIKAN UTAMA DI SINI ---
+    // Hanya coba hapus item yang memiliki $id (berasal dari keranjang asli)
+    const itemsToDelete = cartItems.filter(item => item.$id);
+    if (itemsToDelete.length > 0) {
+      const deletePromises = itemsToDelete.map(item => 
+        databases.deleteDocument(config.databaseId!, config.keranjangCollectionId!, item.$id)
+      );
+      await Promise.all(deletePromises);
+    }
+    // ------------------------------------
 
-//         await Promise.all(itemPromises);
-//         return newOrder.$id;
-
-//     } catch (error: any) {
-//         console.error("Error saat membuat pesanan:", error);
-//         throw new Error(error.message || "Gagal membuat pesanan.");
-//     }
-// }
+    return newOrder.$id;
+  } catch (error: any) {
+    console.error("Gagal membuat pesanan:", error);
+    throw new Error(error.message);
+  }
+};
 
 // =================================================================
 // FUNGSI AGEN
@@ -517,8 +520,6 @@ export async function saveFinishedDesign(
   }
 }
 
-export { ID };
-
 export async function getFinishedDesigns(userId: string) {
   try {
     if (!config.finishedDesignsCollectionId) {
@@ -601,32 +602,24 @@ export async function createCustomDesignOrder(
         userId,
         shippingAddress,
         totalAmount,
-        status: 'pending', // Status awal pesanan
+        status: 'pending',
       }
     );
 
     if (!newOrder) throw new Error("Gagal membuat data pesanan.");
 
-    // 2. Buat satu item pesanan yang merepresentasikan desain kustom
-    // Kita gunakan ID Admin untuk relasi produk jika diperlukan,
-    // atau bisa juga dikosongkan jika tidak ada relasi produk fisik.
     await databases.createDocument(
       config.databaseId!,
       config.orderItemsCollectionId!,
       ID.unique(),
       {
         orderId: newOrder.$id,
-        // Kita tidak punya productId, jadi kita simpan nama dan gambar
-        // sebagai gantinya untuk referensi admin.
         productName: design.name, 
         productImageUrl: design.imageUrl,
         quantity: 1,
         priceAtPurchase: totalAmount,
       }
     );
-    
-    // Pastikan koleksi 'order_items' Anda memiliki atribut
-    // 'productName' (String) dan 'productImageUrl' (String, URL)
 
     return newOrder.$id;
   } catch (error: any) {
@@ -739,48 +732,7 @@ export async function getCartItems(userId: string) {
   }
 }
 
-/**
- * Fungsi createOrder juga perlu diupdate untuk menangani item kustom.
- */
-export const createOrder = async (userId: string, shippingAddress: string, totalAmount: number, cartItems: any[]) => {
-  try {
-    const newOrder = await databases.createDocument(config.databaseId!, config.ordersCollectionId!, ID.unique(), {
-      userId,
-      shippingAddress,
-      totalAmount,
-      status: 'pending',
-    });
 
-    const orderItemPromises = cartItems.map((item) => {
-      return databases.createDocument(config.databaseId!, config.orderItemsCollectionId!, ID.unique(), {
-        orderId: newOrder.$id,
-        quantity: item.quantity,
-        priceAtPurchase: item.product.price,
-        productId: item.isCustom ? null : item.product.$id,
-        productName: item.product.name,
-        productImageUrl: item.product.image,
-      });
-    });
-
-    await Promise.all(orderItemPromises);
-    
-    // --- PERBAIKAN UTAMA DI SINI ---
-    // Hanya coba hapus item yang memiliki $id (berasal dari keranjang asli)
-    const itemsToDelete = cartItems.filter(item => item.$id);
-    if (itemsToDelete.length > 0) {
-      const deletePromises = itemsToDelete.map(item => 
-        databases.deleteDocument(config.databaseId!, config.keranjangCollectionId!, item.$id)
-      );
-      await Promise.all(deletePromises);
-    }
-    // ------------------------------------
-
-    return newOrder.$id;
-  } catch (error: any) {
-    console.error("Gagal membuat pesanan:", error);
-    throw new Error(error.message);
-  }
-};
 
 export async function getAgentDashboardStats(agentId: string) {
   try {

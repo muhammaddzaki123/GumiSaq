@@ -5,18 +5,19 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logoawal.jpg",
-    "scheme": "gumisaq",
+    "scheme": "com.saqcloth.gumisaq",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.saqcloth.gumisaq"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logoawal.jpg",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.saqcloth.gumisaq"
     },
     "web": {
       "bundler": "metro",

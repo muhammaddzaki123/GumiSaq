@@ -15,7 +15,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import icons from "@/constants/icons";
 import images from "@/constants/images";
-import { loginUser } from "@/lib/appwrite";
+// Import fungsi baru
+import { loginUser, signInWithGoogle } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 
 export default function SignIn() {
@@ -49,6 +50,23 @@ export default function SignIn() {
       setIsSubmitting(false);
     }
   };
+
+  const handleGoogleSignIn = async () => {
+    setIsSubmitting(true);
+    try {
+        await signInWithGoogle();
+        // Catatan: Setelah login Google, Appwrite akan me-redirect kembali ke aplikasi.
+        // Proses `refetch` dan navigasi mungkin perlu ditangani di level yang lebih tinggi
+        // yang mendengarkan perubahan status otentikasi, seperti di GlobalProvider.
+    } catch (error: any) {
+        Alert.alert("Error Login Google", error.message);
+    } finally {
+        // Mungkin tidak perlu setIsSubmitting(false) di sini karena aplikasi akan di-restart/dibuka ulang.
+        // Tapi kita tetap pasang untuk keamanan.
+        setIsSubmitting(false);
+    }
+  };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -93,7 +111,6 @@ export default function SignIn() {
             </View>
           </View>
 
-          {/* Submit Button */}
           <TouchableOpacity
             onPress={handleLogin}
             disabled={isSubmitting}
@@ -104,20 +121,22 @@ export default function SignIn() {
             </Text>
           </TouchableOpacity>
           
-          {/* Divider */}
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>ATAU</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Social Login */}
-          <TouchableOpacity style={styles.socialButton}>
+          {/* PERUBAHAN DI SINI */}
+          <TouchableOpacity 
+            style={styles.socialButton}
+            onPress={handleGoogleSignIn} // Panggil fungsi handleGoogleSignIn
+            disabled={isSubmitting}
+          >
             <Image source={icons.google} style={styles.socialIcon} resizeMode="contain" />
             <Text style={styles.socialButtonText}>Lanjutkan dengan Google</Text>
           </TouchableOpacity>
           
-          {/* Sign Up Link */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>Belum punya akun? </Text>
             <TouchableOpacity onPress={() => router.push('/sign-up')}>
@@ -130,6 +149,7 @@ export default function SignIn() {
   );
 }
 
+// Stylesheet (tetap sama)
 const styles = StyleSheet.create({
   container: {
     flex: 1,
