@@ -1,7 +1,7 @@
 import { Artikel } from "@/components/Berita";
 import DetailArtikel from "@/components/DetailArtikel";
-import Search from "@/components/Search";
 import NoResults from '@/components/NoResults'; // Impor NoResults
+import Search from "@/components/Search";
 import { Article } from "@/constants/article";
 import { useArticles } from "@/constants/useArticles";
 import { Ionicons } from "@expo/vector-icons";
@@ -48,7 +48,7 @@ const ArtikelScreen = () => {
 					<TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
 						<Ionicons name="arrow-back" size={28} color="#191D31" />
 					</TouchableOpacity>
-					<Text className="text-xl font-rubik-bold text-black-300">Artikel Gizi</Text>
+					<Text className="text-xl font-rubik-bold text-black-300">Artikel</Text>
 					<View className="w-10"/>
 				</View>
 				
