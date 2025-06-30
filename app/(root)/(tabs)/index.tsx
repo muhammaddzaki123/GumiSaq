@@ -1,14 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -20,7 +21,6 @@ import { getLatestProperties, getProperties } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { useAppwrite } from "@/lib/useAppwrite";
 
-// Komponen Header dipisahkan agar lebih rapi
 const HomeHeader = ({ user, query }: { user: any, query?: string }) => (
   <View style={styles.section}>
     {!query && (
@@ -47,33 +47,34 @@ const HomeHeader = ({ user, query }: { user: any, query?: string }) => (
 const Home = () => {
   const { user } = useGlobalContext();
   const params = useLocalSearchParams<{ query?: string; filter?: string }>();
+  
+  // Ambil nilai query dan filter dari parameter URL
   const query = params.query || "";
+  const filter = params.filter || "All";
 
-  const { data: latestProperties, loading: latestLoading } = useAppwrite({
+  // --- PERBAIKAN UTAMA: Satu sumber data ---
+  // Hook ini sekarang bertanggung jawab untuk semua pengambilan data produk
+  const { data: properties, loading: propertiesLoading, refetch } = useAppwrite({
+    fn: () => getProperties({ query, filter }), // Kirim query dan filter
+    // `skip` tidak lagi diperlukan karena `useEffect` akan menangani pembaruan
+  });
+
+  const { data: latestProperties, loading: latestLoading, refetch: refetchLatest } = useAppwrite({
     fn: getLatestProperties,
   });
 
-  const { data: searchResults, loading: searchLoading, refetch } = useAppwrite({
-    fn: () => getProperties({ query }),
-    skip: !query, // Hanya jalankan hook ini jika ada query
-  });
-
-  const { data: initialProperties } = useAppwrite({
-    fn: () => getProperties({ limit: 6 }), // Ambil beberapa properti awal
-    skip: !!query, // Jangan jalankan jika sedang mencari
-  });
-
+  // useEffect ini akan dijalankan setiap kali query atau filter berubah
   useEffect(() => {
-    if (query) {
-      refetch();
-    }
-  }, [query]);
+    refetch();
+  }, [query, filter]);
 
-  // Tentukan data mana yang akan ditampilkan: hasil pencarian atau data awal
-  const displayedProperties = useMemo(() => {
-    if (query) return searchResults;
-    return initialProperties;
-  }, [query, searchResults, initialProperties]);
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetchLatest();
+    await refetch(); // Refresh data utama
+    setRefreshing(false);
+  };
 
   const handleCardPress = (id: string) => router.push(`/properties/${id}`);
 
@@ -88,7 +89,7 @@ const Home = () => {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        data={displayedProperties as any[]}
+        data={properties as any[]}
         keyExtractor={(item) => item.$id}
         renderItem={renderRecommendationItem}
         numColumns={2}
@@ -98,8 +99,8 @@ const Home = () => {
           <>
             <HomeHeader user={user} query={query} />
             
-            {/* Hanya tampilkan Unggulan jika tidak sedang mencari */}
-            {!query && (
+            {/* Sembunyikan konten lain saat ada pencarian atau filter aktif */}
+            {!query && filter === "All" && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Unggulan</Text>
@@ -122,7 +123,6 @@ const Home = () => {
               </View>
             )}
 
-            {/* Tampilkan judul berdasarkan apakah ada query atau tidak */}
             <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>
                     {query ? `Hasil untuk "${query}"` : "Rekomendasi"}
@@ -133,16 +133,19 @@ const Home = () => {
                     </TouchableOpacity>
                 )}
             </View>
-            {!query && <Filters />}
+            <Filters />
           </>
         )}
         ListEmptyComponent={() => (
-          (searchLoading) ? (
+          propertiesLoading ? (
             <ActivityIndicator size="large" color="#526346" style={{ marginTop: 20 }}/>
           ) : (
-            query && <NoResults /> // Hanya tampilkan NoResults jika ada query
+            <NoResults />
           )
         )}
+        refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#526346" />
+        }
       />
     </SafeAreaView>
   );
