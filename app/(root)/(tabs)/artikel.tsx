@@ -67,7 +67,7 @@ const ArtikelScreen = () => {
 				<TouchableOpacity onPress={handleBackToList}>
 					<Ionicons name="arrow-back" size={24} color="white" />
 				</TouchableOpacity>
-				<Text className="text-white text-xl font-bold ml-4">ARTIKEL GIZI</Text>
+				<Text className="text-white text-xl font-bold ml-4">ARTIKEL</Text>
 				<TouchableOpacity onPress={handleBackToList} className="ml-auto">
 					<Text className="text-3xl text-white mr-4">×</Text>
 				</TouchableOpacity>

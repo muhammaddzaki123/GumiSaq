@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Image,
-  RefreshControl,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -20,27 +20,26 @@ import { getLatestProperties, getProperties } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 import { useAppwrite } from "@/lib/useAppwrite";
 
-const HomeHeader = ({ user }: any) => (
-  <View className="px-4 mb-6">
-    <View className="flex-row items-center justify-between">
-      <View className="flex-row items-center gap-3">
-        <Image
-          source={{ uri: user?.avatar }}
-          className="w-14 h-14 rounded-full border-2 border-primary-200"
-        />
-        <View>
-          <Text className="text-sm font-rubik text-black-200">
-            Selamat Datang,
-          </Text>
-          <Text className="text-xl font-rubik-semibold text-black-300">
-            {user?.name}
-          </Text>
+// Komponen Header dipisahkan agar lebih rapi
+const HomeHeader = ({ user, query }: { user: any, query?: string }) => (
+  <View style={styles.section}>
+    {!query && (
+      <View style={styles.headerRow}>
+        <View style={styles.userInfo}>
+          <Image
+            source={{ uri: user?.avatar }}
+            style={styles.avatar}
+          />
+          <View>
+            <Text style={styles.greetingText}>Selamat Datang,</Text>
+            <Text style={styles.userName}>{user?.name}</Text>
+          </View>
         </View>
+        <TouchableOpacity onPress={() => router.push('/(root)/(keranjang)/keranjang')} style={styles.cartButton}>
+          <Ionicons name="cart-outline" size={28} color="#191D31" />
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity onPress={() => router.push('/(root)/(keranjang)/keranjang')} className="bg-white p-3 rounded-full shadow-sm">
-        <Ionicons name="cart-outline" size={28} color="#191D31" />
-      </TouchableOpacity>
-    </View>
+    )}
     <Search />
   </View>
 );
@@ -48,31 +47,36 @@ const HomeHeader = ({ user }: any) => (
 const Home = () => {
   const { user } = useGlobalContext();
   const params = useLocalSearchParams<{ query?: string; filter?: string }>();
+  const query = params.query || "";
 
-  const { data: latestProperties, loading: latestLoading, refetch: refetchLatest } = useAppwrite({
+  const { data: latestProperties, loading: latestLoading } = useAppwrite({
     fn: getLatestProperties,
   });
 
-  const { data: properties, loading: propertiesLoading, refetch: refetchProperties } = useAppwrite({
-    fn: getProperties,
-    params: { filter: params.filter!, query: params.query!, limit: 10 },
-    skip: true,
+  const { data: searchResults, loading: searchLoading, refetch } = useAppwrite({
+    fn: () => getProperties({ query }),
+    skip: !query, // Hanya jalankan hook ini jika ada query
   });
 
-  const [refreshing, setRefreshing] = useState(false);
+  const { data: initialProperties } = useAppwrite({
+    fn: () => getProperties({ limit: 6 }), // Ambil beberapa properti awal
+    skip: !!query, // Jangan jalankan jika sedang mencari
+  });
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await Promise.all([refetchLatest(), refetchProperties()]);
-    setRefreshing(false);
-  };
-  
   useEffect(() => {
-    refetchProperties({ filter: params.filter!, query: params.query!, limit: 10 });
-  }, [params.filter, params.query]);
+    if (query) {
+      refetch();
+    }
+  }, [query]);
+
+  // Tentukan data mana yang akan ditampilkan: hasil pencarian atau data awal
+  const displayedProperties = useMemo(() => {
+    if (query) return searchResults;
+    return initialProperties;
+  }, [query, searchResults, initialProperties]);
 
   const handleCardPress = (id: string) => router.push(`/properties/${id}`);
-  
+
   const renderFeaturedItem = ({ item }: { item: any }) => (
     <FeaturedCard item={item} onPress={() => handleCardPress(item.$id)} />
   );
@@ -82,64 +86,80 @@ const Home = () => {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F8F9FA' }}>
+    <SafeAreaView style={styles.container}>
       <FlatList
-        data={properties}
-        keyExtractor={(item: any) => item.$id}
+        data={displayedProperties as any[]}
+        keyExtractor={(item) => item.$id}
         renderItem={renderRecommendationItem}
         numColumns={2}
         columnWrapperStyle={{ gap: 16 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }} 
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100 }}
         ListHeaderComponent={() => (
           <>
-            <HomeHeader user={user} />
+            <HomeHeader user={user} query={query} />
             
-            {/* Bagian Unggulan */}
-            <View className="mb-8">
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-2xl font-rubik-bold text-black-300">
-                  Unggulan
-                </Text>
-                <TouchableOpacity onPress={() => router.push('/explore')}>
-                  <Text className="text-base font-rubik-medium text-primary-100">
-                    Lihat Semua
-                  </Text>
-                </TouchableOpacity>
+            {/* Hanya tampilkan Unggulan jika tidak sedang mencari */}
+            {!query && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Unggulan</Text>
+                  <TouchableOpacity onPress={() => router.push('/explore')}>
+                    <Text style={styles.seeAllText}>Lihat Semua</Text>
+                  </TouchableOpacity>
+                </View>
+                {latestLoading ? (
+                  <ActivityIndicator size="large" color="#526346" />
+                ) : (
+                  <FlatList
+                    data={latestProperties}
+                    renderItem={renderFeaturedItem}
+                    keyExtractor={(item) => item.$id}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ paddingVertical: 8, gap: 16 }}
+                  />
+                )}
               </View>
+            )}
 
-              {latestLoading ? (
-                <ActivityIndicator size="large" color="#526346" />
-              ) : (
-                <FlatList
-                  data={latestProperties}
-                  renderItem={renderFeaturedItem}
-                  keyExtractor={(item: any) => item.$id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  // **PERBAIKAN UTAMA:** Menambahkan padding dan jarak yang tepat
-                  contentContainerStyle={{ paddingHorizontal: 4, gap: 16 }} 
-                />
-              )}
+            {/* Tampilkan judul berdasarkan apakah ada query atau tidak */}
+            <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                    {query ? `Hasil untuk "${query}"` : "Rekomendasi"}
+                </Text>
+                {query && (
+                    <TouchableOpacity onPress={() => router.setParams({ query: '' })}>
+                        <Text style={styles.seeAllText}>Hapus</Text>
+                    </TouchableOpacity>
+                )}
             </View>
-
-            {/* Judul Bagian Rekomendasi & Filter */}
-            <View className="mb-4">
-              <Text className="text-2xl font-rubik-bold text-black-300">
-                Rekomendasi
-              </Text>
-              <Filters />
-            </View>
+            {!query && <Filters />}
           </>
         )}
         ListEmptyComponent={() => (
-          !propertiesLoading && <NoResults />
+          (searchLoading) ? (
+            <ActivityIndicator size="large" color="#526346" style={{ marginTop: 20 }}/>
+          ) : (
+            query && <NoResults /> // Hanya tampilkan NoResults jika ada query
+          )
         )}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#526346" />
-        }
       />
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F8F9FA' },
+  section: { marginBottom: 24 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  userInfo: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  avatar: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: '#8CCD61' },
+  greetingText: { fontFamily: 'Rubik-Regular', color: '#666876', fontSize: 14 },
+  userName: { fontFamily: 'Rubik-SemiBold', color: '#191D31', fontSize: 20 },
+  cartButton: { backgroundColor: 'white', padding: 12, borderRadius: 22, elevation: 2, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5},
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  sectionTitle: { fontSize: 24, fontFamily: 'Rubik-Bold', color: '#191D31' },
+  seeAllText: { fontSize: 16, fontFamily: 'Rubik-Medium', color: '#526346' },
+});
 
 export default Home;
