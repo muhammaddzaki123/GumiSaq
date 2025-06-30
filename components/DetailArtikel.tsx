@@ -1,31 +1,28 @@
+import { getArticleById } from "@/lib/article";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Animated,
 	Dimensions,
 	Image,
 	Platform,
-	SafeAreaView,
 	StatusBar,
 	StyleSheet,
 	Text,
 	TouchableOpacity,
-	View,
+	View
 } from "react-native";
-import { getArticleById } from "@/lib/article";
 
 const { width } = Dimensions.get("window");
-const HEADER_HEIGHT = 320;
+const HEADER_HEIGHT = 350;
 
 const DetailArtikel = ({ id, onBack }: { id: string; onBack?: () => void }) => {
 	const router = useRouter();
 	const [data, setData] = useState<any>(null);
 	const [loading, setLoading] = useState(true);
 	const scrollY = useRef(new Animated.Value(0)).current;
-	const [liked, setLiked] = useState(false);
-	const scaleAnim = useRef(new Animated.Value(1)).current;
 
 	useEffect(() => {
 		if (id) {
@@ -36,46 +33,46 @@ const DetailArtikel = ({ id, onBack }: { id: string; onBack?: () => void }) => {
 		}
 	}, [id]);
 
-	const overlayOpacity = scrollY.interpolate({
-		inputRange: [0, HEADER_HEIGHT / 2, HEADER_HEIGHT - 40],
-		outputRange: [0, 0.3, 0.7],
+    // --- PERBAIKAN UTAMA DI SINI ---
+    // Membuat scroll handler di luar JSX menggunakan useCallback
+    const handleScroll = useCallback(
+        Animated.event(
+            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+            { useNativeDriver: false } // useNativeDriver: false diperlukan untuk interpolasi
+        ),
+        [scrollY]
+    );
+
+	const headerTranslateY = scrollY.interpolate({
+		inputRange: [0, HEADER_HEIGHT],
+		outputRange: [0, -HEADER_HEIGHT],
 		extrapolate: "clamp",
 	});
 
-	const buttonOpacity = scrollY.interpolate({
-		inputRange: [0, HEADER_HEIGHT - 80],
+	const imageOpacity = scrollY.interpolate({
+		inputRange: [0, HEADER_HEIGHT / 2],
 		outputRange: [1, 0],
-		extrapolate: "clamp",
+		extrapolate: 'clamp',
 	});
-
-	const handleLike = () => {
-		setLiked((prev) => !prev);
-		Animated.sequence([
-			Animated.timing(scaleAnim, {
-				toValue: 1.3,
-				duration: 120,
-				useNativeDriver: true,
-			}),
-			Animated.timing(scaleAnim, {
-				toValue: 1,
-				duration: 120,
-				useNativeDriver: true,
-			}),
-		]).start();
-	};
+    
+	const titleTranslateY = scrollY.interpolate({
+		inputRange: [0, HEADER_HEIGHT / 2, HEADER_HEIGHT],
+		outputRange: [0, -50, -80],
+		extrapolate: 'clamp',
+	});
 
 	if (loading) {
 		return (
-			<View className="flex-1 items-center justify-center bg-primary-100">
-				<ActivityIndicator size="large" color="#fff" />
+			<View style={styles.centeredContainer}>
+				<ActivityIndicator size="large" color="#526346" />
 			</View>
 		);
 	}
 
 	if (!data) {
 		return (
-			<View className="flex-1 items-center justify-center bg-primary-100">
-				<Text className="text-white">Data tidak ditemukan.</Text>
+			<View style={styles.centeredContainer}>
+				<Text style={styles.errorText}>Artikel tidak ditemukan.</Text>
 			</View>
 		);
 	}
@@ -90,124 +87,227 @@ const DetailArtikel = ({ id, onBack }: { id: string; onBack?: () => void }) => {
 			: "";
 
 	return (
-		<View className="flex-1 bg-primary-100">
+		<View style={styles.container}>
 			<StatusBar barStyle="light-content" />
 
-			{/* Background Gambar + Overlay */}
-			<View className="absolute top-0 left-0 right-0 z-1" pointerEvents="none">
-				<Image
+			<TouchableOpacity
+				onPress={onBack || (() => router.back())}
+				style={styles.backButton}
+			>
+				<Ionicons name="arrow-back" size={28} color="#fff" />
+			</TouchableOpacity>
+
+			<Animated.View style={[styles.header, { transform: [{ translateY: headerTranslateY }] }]}>
+				<Animated.Image
 					source={{ uri: data.image }}
-					style={{ width, height: HEADER_HEIGHT }}
-					className="rounded-b-[32px]"
+					style={[styles.headerImage, { opacity: imageOpacity }]}
 					resizeMode="cover"
 				/>
-				<Animated.View
-					style={[
-						StyleSheet.absoluteFill,
-						{
-							opacity: overlayOpacity,
-							backgroundColor: "#222", // Tetap hitam untuk overlay, tidak ada padanan langsung di tailwind.config
-							borderBottomLeftRadius: 32,
-							borderBottomRightRadius: 32,
-						},
-					]}
-				/>
-			</View>
-
-			{/* Tombol Back & Like */}
-			<Animated.View
-				style={[
-					{
-						position: "absolute",
-						top: Platform.OS === "android" ? 40 : 60,
-						left: 0,
-						right: 0,
-						zIndex: 4,
-						opacity: buttonOpacity,
-						paddingHorizontal: 16,
-						flexDirection: "row",
-						justifyContent: "space-between",
-						alignItems: "center",
-					},
-				]}
-				pointerEvents="box-none"
-			>
-				<TouchableOpacity
-					onPress={onBack ? onBack : () => router.back()}
-					className="p-2"
-				>
-					<Ionicons name="arrow-back" size={28} color="#fff" />
-				</TouchableOpacity>
-
-				<TouchableOpacity
-					onPress={handleLike}
-					activeOpacity={0.7}
-					className="p-2"
-				>
-					<Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-						<Ionicons
-							name={liked ? "heart" : "heart-outline"}
-							size={28}
-							color={liked ? "#e53935" : "#fff"} // Warna merah untuk hati tetap eksplisit karena tidak ada di tailwind.config
-						/>
-					</Animated.View>
-				</TouchableOpacity>
+				<View style={styles.headerOverlay} />
+                 <Animated.View style={[styles.headerContent, { transform: [{ translateY: titleTranslateY }] }]}>
+                    <Text style={styles.headerCategory}>{data.category}</Text>
+                    <Text style={styles.headerTitle}>{data.title}</Text>
+                </Animated.View>
 			</Animated.View>
 
-			{/* Scrollable Konten */}
 			<Animated.ScrollView
-				className="flex-1 z-4"
-				contentContainerStyle={{
-					paddingTop: HEADER_HEIGHT - 30,
-					paddingBottom: 32,
-				}}
-				scrollEventThrottle={16}
+				contentContainerStyle={styles.scrollContainer}
 				showsVerticalScrollIndicator={false}
-				onScroll={Animated.event(
-					[{ nativeEvent: { contentOffset: { y: scrollY } } }],
-					{ useNativeDriver: false }
-				)}
+                // Menggunakan handler yang sudah dibuat
+				onScroll={handleScroll} 
+                scrollEventThrottle={16}
 			>
-				<View className="w-full mt-[-30px] px-5 pt-6 pb-6 bg-primary-100 rounded-t-2xl z-4">
-					<View className="items-center py-2">
-						<View className="w-16 h-1.5 bg-gray-300 rounded-md mb-2" />
-					</View>
+                <View style={styles.metaContainer}>
+                    <View style={styles.authorInfo}>
+                        <Image source={{ uri: `https://ui-avatars.com/api/?name=${data.author}&background=8CCD61&color=fff` }} style={styles.authorAvatar} />
+                        <View>
+                            <Text style={styles.authorName}>{data.author}</Text>
+                            <Text style={styles.publishDate}>{dateString}</Text>
+                        </View>
+                    </View>
+                    <View style={styles.statsInfo}>
+                        <Ionicons name="eye-outline" size={16} color="#6B7280" />
+                        <Text style={styles.viewCount}>{data.viewCount} views</Text>
+                    </View>
+                </View>
 
-					<Text className="text-white text-2xl font-bold mb-1">
-						{data.title}
-					</Text>
-					<Text className="text-gray-300 mb-4">
-						{dateString ? `Published ${dateString}` : ""}
-					</Text>
-
-					<Text className="text-white mb-3">{data.description}</Text>
-
-					{data.image2 && (
+				<View style={styles.contentBody}>
+					<Text style={styles.descriptionText}>{data.description}</Text>
+                    
+                    {data.image2 && (
 						<Image
 							source={{ uri: data.image2 }}
-							className="w-full h-[140px] rounded-xl mb-3"
+							style={styles.contentImage}
 							resizeMode="cover"
 						/>
 					)}
 					{data.description2 && (
-						<Text className="text-white mb-3">{data.description2}</Text>
+						<Text style={styles.descriptionText}>{data.description2}</Text>
 					)}
-					{data.image3 && (
+
+                    {data.image3 && (
 						<Image
 							source={{ uri: data.image3 }}
-							className="w-full h-[140px] rounded-xl mb-3"
+							style={styles.contentImage}
 							resizeMode="cover"
 						/>
 					)}
 					{data.description3 && (
-						<Text className="text-white mb-3">{data.description3}</Text>
+						<Text style={styles.descriptionText}>{data.description3}</Text>
 					)}
+
+                    {data.tags && data.tags.length > 0 && (
+                        <View style={styles.tagsContainer}>
+                            {data.tags.map((tag: string, index: number) => (
+                                <View key={index} style={styles.tag}>
+                                    <Text style={styles.tagText}>{tag}</Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
 				</View>
 			</Animated.ScrollView>
-
-			<SafeAreaView />
 		</View>
 	);
 };
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: 'white' },
+    centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    errorText: { fontFamily: 'Rubik-Medium', fontSize: 16, color: '#374151' },
+    backButton: {
+        position: 'absolute',
+        top: Platform.OS === 'ios' ? 60 : 40,
+        left: 16,
+        zIndex: 10,
+        backgroundColor: 'rgba(0,0,0,0.3)',
+        borderRadius: 20,
+        width: 40,
+        height: 40,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    header: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: HEADER_HEIGHT,
+        zIndex: 1,
+        justifyContent: 'flex-end',
+    },
+    headerImage: {
+        ...StyleSheet.absoluteFillObject,
+        width: '100%',
+        height: HEADER_HEIGHT,
+    },
+    headerOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+    },
+    headerContent: {
+        padding: 20,
+    },
+    headerCategory: {
+        fontFamily: 'Rubik-Medium',
+        fontSize: 14,
+        color: 'white',
+        backgroundColor: '#526346',
+        alignSelf: 'flex-start',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 99,
+        overflow: 'hidden',
+        marginBottom: 8,
+    },
+    headerTitle: {
+        fontFamily: 'Rubik-Bold',
+        fontSize: 28,
+        color: 'white',
+        lineHeight: 36,
+        textShadowColor: 'rgba(0, 0, 0, 0.5)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 3,
+    },
+    scrollContainer: {
+        paddingTop: HEADER_HEIGHT,
+        backgroundColor: 'white',
+    },
+    metaContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        borderBottomWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    authorInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    authorAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+    },
+    authorName: {
+        fontFamily: 'Rubik-Medium',
+        fontSize: 14,
+        color: '#1F2937',
+    },
+    publishDate: {
+        fontFamily: 'Rubik-Regular',
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    statsInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    viewCount: {
+        fontFamily: 'Rubik-Regular',
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    contentBody: {
+        padding: 20,
+    },
+    descriptionText: {
+        fontFamily: 'Rubik-Regular',
+        fontSize: 16,
+        lineHeight: 28,
+        color: '#374151',
+        marginBottom: 20,
+    },
+    contentImage: {
+        width: '100%',
+        height: 200,
+        borderRadius: 12,
+        marginBottom: 20,
+    },
+    tagsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: 24,
+        borderTopWidth: 1,
+        borderColor: '#F3F4F6',
+        paddingTop: 24,
+    },
+    tag: {
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 99,
+    },
+    tagText: {
+        fontFamily: 'Rubik-Medium',
+        fontSize: 12,
+        color: '#374151',
+    },
+});
 
 export default DetailArtikel;

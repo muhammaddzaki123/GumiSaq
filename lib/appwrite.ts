@@ -108,12 +108,13 @@ export async function loginUser(email: string, password: string) {
 
 export async function signInWithGoogle() {
   try {
-    // Appwrite akan membuka browser. Setelah login, pengguna akan
-    // diarahkan kembali ke aplikasi melalui custom scheme.
     await account.createOAuth2Session(OAuthProvider.Google);
-  } catch (error: any) {
-    console.error("Error saat memulai sesi Google:", error);
-    throw new Error(error.message || "Gagal memulai login dengan Google.");
+  } catch (error: unknown) {
+    console.error("Error selama proses login Google:", error);
+    if (error instanceof Error) {
+      throw new Error(`Gagal memulai login Google: ${error.message}`);
+    }
+    throw new Error("Terjadi kesalahan yang tidak diketahui saat login dengan Google.");
   }
 }
 
