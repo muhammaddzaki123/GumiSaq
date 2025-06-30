@@ -1,12 +1,14 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { ProductForm } from '@/constants/agent/ProductForm';
 import { config, databases } from '@/lib/appwrite';
 import { useGlobalContext } from '@/lib/global-provider';
 import { Product } from '@/types/product';
 
-export default function EditProduct() {
+export default function EditProductScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const { user } = useGlobalContext();
@@ -22,34 +24,37 @@ export default function EditProduct() {
   }, [user, id]);
 
   const loadProduct = async () => {
-    // Pastikan id adalah string tunggal
     const productId = Array.isArray(id) ? id[0] : id;
-    if (!productId) return;
+    if (!productId) {
+        setLoading(false);
+        return;
+    };
     
     try {
+      setLoading(true);
       const doc = await databases.getDocument(
         config.databaseId!,
         config.stokCollectionId!,
         productId
       );
 
-      // Memetakan data dari dokumen ke interface Product yang benar
       const fetchedProduct: Product = {
         $id: doc.$id,
         name: doc.name || '',
         price: Number(doc.price) || 0,
         description: doc.description || '',
         image: doc.image,
-        type: doc.type || 'Other', // Menggunakan 'type' dan memberikan nilai default
-        gallery: doc.gallery || [], // Menggunakan 'gallery'
-        agentId: doc.agentId || user!.$id, // Menggunakan 'agentrelationship'
+        type: doc.type || 'Other',
+        gallery: doc.gallery || [],
+        agentId: doc.agentId || user!.$id,
         status: doc.status || 'active'
       };
       
       setProduct(fetchedProduct);
-
     } catch (error) {
       console.error('Error loading product:', error);
+      // Optionally, show an alert before navigating back
+      // Alert.alert("Error", "Gagal memuat detail produk.");
       router.back();
     } finally {
       setLoading(false);
@@ -58,35 +63,70 @@ export default function EditProduct() {
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
-        <Text className="text-black-300 font-rubik">Memuat...</Text>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#526346" />
+        <Text style={styles.loadingText}>Memuat Detail Produk...</Text>
       </View>
     );
   }
 
+  if (!product) {
+    return (
+        <View style={styles.centerContainer}>
+            <Text style={styles.errorText}>Gagal memuat produk. Silakan coba lagi.</Text>
+        </View>
+    )
+  }
+
   return (
-    <View className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
           headerTitle: 'Edit Produk',
-          headerTitleStyle: {
-            fontFamily: 'Rubik-Medium',
-          },
+          headerTitleStyle: { fontFamily: 'Rubik-Bold' },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#F8F9FA' },
         }}
       />
 
-      <ScrollView className="flex-1 p-4">
-        {/* Pastikan ProductForm menerima data produk yang sudah dimuat */}
-        {product && (
-            <ProductForm
-              mode="edit"
-              initialData={product}
-              onSuccess={() => {
-                router.back();
-              }}
-            />
-        )}
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Formulir produk sekarang memiliki padding dan berada di dalam ScrollView */}
+        <ProductForm
+          mode="edit"
+          initialData={product}
+          onSuccess={() => {
+            router.back();
+          }}
+        />
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F8F9FA',
+    },
+    scrollContainer: {
+        padding: 16, // Memberi padding di sekitar form
+        paddingBottom: 40,
+    },
+    centerContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F8F9FA',
+    },
+    loadingText: {
+        marginTop: 10,
+        fontFamily: 'Rubik-Medium',
+        fontSize: 16,
+        color: '#6B7280',
+    },
+    errorText: {
+        fontFamily: 'Rubik-Medium',
+        fontSize: 16,
+        color: '#EF4444',
+    }
+});

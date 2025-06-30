@@ -764,8 +764,16 @@ export const createOrder = async (userId: string, shippingAddress: string, total
 
     await Promise.all(orderItemPromises);
     
-    const deletePromises = cartItems.map(item => databases.deleteDocument(config.databaseId!, config.keranjangCollectionId!, item.$id));
-    await Promise.all(deletePromises);
+    // --- PERBAIKAN UTAMA DI SINI ---
+    // Hanya coba hapus item yang memiliki $id (berasal dari keranjang asli)
+    const itemsToDelete = cartItems.filter(item => item.$id);
+    if (itemsToDelete.length > 0) {
+      const deletePromises = itemsToDelete.map(item => 
+        databases.deleteDocument(config.databaseId!, config.keranjangCollectionId!, item.$id)
+      );
+      await Promise.all(deletePromises);
+    }
+    // ------------------------------------
 
     return newOrder.$id;
   } catch (error: any) {

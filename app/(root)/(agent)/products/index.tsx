@@ -2,17 +2,56 @@ import { ProductForm } from '@/constants/agent/ProductForm';
 import { config, databases } from '@/lib/appwrite';
 import { useGlobalContext } from '@/lib/global-provider';
 import { Product } from '@/types/product';
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Query } from 'react-native-appwrite';
+
+// Komponen Kartu Produk untuk tampilan yang lebih rapi
+const ProductCard = ({ product, onEdit, onDelete }: { product: Product, onEdit: () => void, onDelete: () => void }) => (
+    <View style={styles.card}>
+        <Image source={{ uri: product.image }} style={styles.cardImage} />
+        <View style={styles.cardBody}>
+            <View>
+                <Text style={styles.cardTitle}>{product.name}</Text>
+                <Text style={styles.cardPrice}>Rp {product.price.toLocaleString('id-ID')}</Text>
+            </View>
+            <Text style={styles.cardDescription} numberOfLines={2}>{product.description}</Text>
+        </View>
+        <View style={styles.cardActions}>
+            <TouchableOpacity onPress={onEdit} style={[styles.actionButton, styles.editButton]}>
+                <Ionicons name="create-outline" size={18} color="#2563EB" />
+                <Text style={[styles.actionButtonText, { color: '#2563EB' }]}>Edit</Text>
+            </TouchableOpacity>
+            {/* --- PERBAIKAN DI SINI: Menghapus referensi ke styles.deleteButton --- */}
+            <TouchableOpacity onPress={onDelete} style={styles.actionButton}>
+                <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                <Text style={[styles.actionButtonText, { color: '#DC2626' }]}>Hapus</Text>
+            </TouchableOpacity>
+        </View>
+    </View>
+);
 
 export default function AgentProducts() {
   const router = useRouter();
   const { user } = useGlobalContext();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
+  
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     if (!user || (user.userType !== 'agent' && user.userType !== 'admin')) {
@@ -24,165 +63,259 @@ export default function AgentProducts() {
 
   const loadProducts = async () => {
     if (!user) return;
-    
     setLoading(true);
     try {
       const response = await databases.listDocuments(
         config.databaseId!,
         config.stokCollectionId!,
-        // PERBAIKAN 1: Menggunakan nama atribut relasi yang benar
-        [Query.equal('agentId', user.$id)]
+        [Query.equal('agentId', user.$id), Query.orderDesc('$createdAt')]
       );
       
-      // PERBAIKAN 2: Memetakan ke struktur data Product yang baru
       const mappedProducts: Product[] = response.documents.map(doc => ({
         $id: doc.$id,
         name: doc.name || '',
         price: Number(doc.price) || 0,
         description: doc.description || '',
         image: doc.image,
-        type: doc.type || 'Other', // Menggunakan 'type'
-        gallery: doc.gallery || [], // Menambahkan 'gallery'
-        agentId: doc.agentId || user.$id, // Menggunakan 'agentId'
+        type: doc.type || 'Other',
+        gallery: doc.gallery || [],
+        agentId: doc.agentId || user.$id,
         status: doc.status || 'active'
       }));
       
       setProducts(mappedProducts);
     } catch (error) {
       console.error('Error loading products:', error);
-      Alert.alert('Error', 'Gagal memuat produk. Pastikan atribut relasi "agentId" sudah benar.');
+      Alert.alert('Error', 'Gagal memuat produk.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteProduct = async (productId: string) => {
-    try {
-      await databases.deleteDocument(
-        config.databaseId!,
-        config.stokCollectionId!,
-        productId
-      );
-      Alert.alert('Sukses', 'Produk berhasil dihapus');
-      loadProducts(); // Muat ulang daftar produk setelah menghapus
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      Alert.alert('Error', 'Gagal menghapus produk');
-    }
+  const handleOpenForm = (product: Product | null) => {
+    setSelectedProduct(product);
+    setIsFormVisible(true);
+  };
+
+  const handleCloseForm = () => {
+    setIsFormVisible(false);
+    setSelectedProduct(null);
+    loadProducts();
+  };
+
+  const handleDeleteProduct = (product: Product) => {
+    Alert.alert(
+      'Konfirmasi Hapus',
+      `Yakin ingin menghapus produk "${product.name}"?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        { 
+          text: 'Hapus',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await databases.deleteDocument(
+                config.databaseId!,
+                config.stokCollectionId!,
+                product.$id
+              );
+              Alert.alert('Sukses', 'Produk berhasil dihapus');
+              loadProducts();
+            } catch (error) {
+              console.error('Error deleting product:', error);
+              Alert.alert('Error', 'Gagal menghapus produk');
+            }
+          }
+        }
+      ]
+    );
   };
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#526346" />
-        <Text className="text-black-300 font-rubik mt-2">Memuat Produk...</Text>
+        <Text style={{ marginTop: 10, fontFamily: 'Rubik-Medium' }}>Memuat Produk...</Text>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
           headerTitle: 'Kelola Produk',
-          headerTitleStyle: {
-            fontFamily: 'Rubik-Medium',
-          },
+          headerTitleStyle: { fontFamily: 'Rubik-Bold' },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#F8F9FA' },
         }}
       />
 
-      <ScrollView className="flex-1 p-4">
-        {!showAddForm && (
-          <TouchableOpacity
-            onPress={() => setShowAddForm(true)}
-            className="bg-primary-300 p-4 rounded-lg mb-4"
-          >
-            <Text className="text-white font-rubik-bold text-center">
-              + Tambah Produk Baru
-            </Text>
-          </TouchableOpacity>
-        )}
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <TouchableOpacity
+          onPress={() => handleOpenForm(null)}
+          style={styles.addButton}
+        >
+          <Ionicons name="add-outline" size={22} color="white" />
+          <Text style={styles.addButtonText}>Tambah Produk Baru</Text>
+        </TouchableOpacity>
 
-        {showAddForm && (
-          <View className="mb-4">
-            <ProductForm
-              onSuccess={() => {
-                setShowAddForm(false);
-                loadProducts();
-              }}
-            />
+        {products.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="cube-outline" size={80} color="#CBD5E0" />
+            <Text style={styles.emptyTitle}>Anda belum memiliki produk.</Text>
+            <Text style={styles.emptySubtitle}>Ketuk tombol di atas untuk memulai.</Text>
           </View>
+        ) : (
+          products.map((product) => (
+            <ProductCard
+              key={product.$id}
+              product={product}
+              onEdit={() => handleOpenForm(product)}
+              onDelete={() => handleDeleteProduct(product)}
+            />
+          ))
         )}
-
-        <View className="space-y-4">
-          {products.length === 0 && !showAddForm ? (
-              <View className="items-center justify-center p-8 bg-white rounded-lg">
-                  <Text className="text-lg font-rubik-medium text-black-200">Anda belum memiliki produk.</Text>
-                  <Text className="text-sm text-center text-black-100 mt-2">Klik tombol "Tambah Produk Baru" untuk memulai.</Text>
-              </View>
-          ) : (
-            products.map((product) => (
-              <View
-                key={product.$id}
-                className="bg-white p-4 rounded-lg shadow-sm"
-              >
-                {product.image && (
-                  <Image
-                    source={{ uri: product.image }}
-                    className="w-full h-40 rounded-lg mb-4"
-                    resizeMode="cover"
-                  />
-                )}
-                
-                <Text className="text-lg font-rubik-bold text-black-300">
-                  {product.name}
-                </Text>
-                
-                <Text className="text-sm font-rubik text-black-200 mt-1">
-                  Rp {product.price.toLocaleString('id-ID')}
-                </Text>
-
-                <View className="bg-gray-100 px-2 py-1 rounded-full self-start mt-2">
-                    <Text className="text-xs font-rubik-medium text-gray-600">{product.type}</Text>
-                </View>
-                
-                <Text className="text-sm font-rubik text-black-200 mt-2">
-                  {product.description}
-                </Text>
-
-                <View className="flex-row justify-end space-x-2 mt-4">
-                  <TouchableOpacity
-                    onPress={() => router.push({ pathname: '/products/[id]', params: { id: product.$id }})}
-                    className="bg-blue-500 px-4 py-2 rounded-lg"
-                  >
-                    <Text className="text-white font-rubik">Edit</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    onPress={() => {
-                      Alert.alert(
-                        'Konfirmasi Hapus',
-                        `Yakin ingin menghapus produk "${product.name}"?`,
-                        [
-                          { text: 'Batal', style: 'cancel' },
-                          { 
-                            text: 'Hapus',
-                            style: 'destructive',
-                            onPress: () => handleDeleteProduct(product.$id)
-                          }
-                        ]
-                      );
-                    }}
-                    className="bg-red-500 px-4 py-2 rounded-lg"
-                  >
-                    <Text className="text-white font-rubik">Hapus</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
       </ScrollView>
-    </View>
+
+      <Modal
+        visible={isFormVisible}
+        animationType="slide"
+        onRequestClose={handleCloseForm}
+      >
+        <SafeAreaView style={{ flex: 1 }}>
+            <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{selectedProduct ? 'Edit Produk' : 'Tambah Produk Baru'}</Text>
+                <TouchableOpacity onPress={handleCloseForm}>
+                    <Ionicons name="close-circle" size={28} color="#6B7280" />
+                </TouchableOpacity>
+            </View>
+            <ScrollView>
+                <ProductForm
+                    mode={selectedProduct ? 'edit' : 'create'}
+                    initialData={selectedProduct}
+                    onSuccess={handleCloseForm}
+                />
+            </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F8F9FA',
+    },
+    scrollContainer: {
+        padding: 16,
+        paddingBottom: 40,
+    },
+    addButton: {
+        backgroundColor: '#526346',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 99,
+        marginBottom: 24,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 5,
+    },
+    addButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontFamily: 'Rubik-Bold',
+        marginLeft: 8,
+    },
+    card: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        marginBottom: 16,
+        overflow: 'hidden',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+    },
+    cardImage: {
+        width: '100%',
+        height: 180,
+    },
+    cardBody: {
+        padding: 16,
+    },
+    cardTitle: {
+        fontSize: 18,
+        fontFamily: 'Rubik-Bold',
+        color: '#1F2937',
+    },
+    cardPrice: {
+        fontSize: 16,
+        fontFamily: 'Rubik-Medium',
+        color: '#526346',
+        marginTop: 4,
+    },
+    cardDescription: {
+        fontSize: 14,
+        fontFamily: 'Rubik-Regular',
+        color: '#6B7280',
+        marginTop: 8,
+    },
+    cardActions: {
+        flexDirection: 'row',
+        borderTopWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    actionButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        gap: 8,
+    },
+    editButton: {
+        borderRightWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    actionButtonText: {
+        fontFamily: 'Rubik-Medium',
+        fontSize: 14,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingTop: 40,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontFamily: 'Rubik-Bold',
+        color: '#374151',
+        marginTop: 16,
+    },
+    emptySubtitle: {
+        fontSize: 16,
+        color: '#6B7280',
+        marginTop: 8,
+        textAlign: 'center',
+        paddingHorizontal: 20,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderColor: '#E5E7EB'
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontFamily: 'Rubik-Bold',
+        color: '#1F2937',
+    }
+});

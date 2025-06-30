@@ -2,7 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from 'react-native';
 import { ID } from 'react-native-appwrite';
 import { config, databases, storage } from '../../lib/appwrite';
 import { useGlobalContext } from '../../lib/global-provider';
@@ -40,51 +50,41 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: !options.multiple,
-      // **PERUBAHAN UTAMA:** Izinkan pemilihan ganda jika `multiple` adalah true
-      allowsMultipleSelection: options.multiple, 
+      allowsMultipleSelection: options.multiple,
       quality: 1,
     });
 
     if (!result.canceled) {
       if (options.multiple && result.assets) {
         const newUris = result.assets.map(asset => asset.uri);
-        // Tambahkan gambar baru ke state yang sudah ada
-        setImageFunc((prevUris: string[]) => [...prevUris, ...newUris]); 
+        setImageFunc((prevUris: string[]) => [...prevUris, ...newUris]);
       } else if (!options.multiple && result.assets) {
         setImageFunc(result.assets[0].uri);
       }
     }
   };
   
-  const getSafeFileExtension = (mimeType: string): string | null => {
+  const getSafeFileExtension = (mimeType: string): string => {
     const map: { [key: string]: string } = {
-        'image/jpeg': 'jpg',
-        'image/pjpeg': 'jpg',
-        'image/png': 'png',
-        'image/gif': 'gif',
-        'image/webp': 'webp',
-        'image/avif': 'avif',
-        'image/heic': 'heic',
+        'image/jpeg': 'jpg', 'image/pjpeg': 'jpg', 'image/png': 'png',
+        'image/gif': 'gif', 'image/webp': 'webp', 'image/avif': 'avif', 'image/heic': 'heic',
     };
-    return map[mimeType.toLowerCase()] || 'jpg'; // Default ke jpg jika tidak diketahui
+    return map[mimeType.toLowerCase()] || 'jpg';
   };
 
   const uploadImage = async (uri: string): Promise<string> => {
       const response = await fetch(uri);
       const blob = await response.blob();
-      
       const fileExtension = getSafeFileExtension(blob.type);
-
-      const fileName = `product_image_${Date.now()}.${fileExtension}`;
+      const fileName = `product_${Date.now()}.${fileExtension}`;
       const file = { name: fileName, type: blob.type, size: blob.size, uri };
-      
       const uploadedFile = await storage.createFile(config.storageBucketId!, ID.unique(), file);
       return storage.getFileView(config.storageBucketId!, uploadedFile.$id).href;
   };
 
   const handleSubmit = async () => {
     if (!name || !price || !description || !type || !mainImage) {
-      Alert.alert('Error', 'Nama, Harga, Deskripsi, Tipe, dan Gambar Utama harus diisi.');
+      Alert.alert('Error', 'Semua kolom yang wajib diisi harus dilengkapi.');
       return;
     }
 
@@ -97,17 +97,13 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
       }
       
       const uploadedGalleryUrls = await Promise.all(
-        galleryImages.filter(uri => !uri.startsWith('http')).map(uri => uploadImage(uri))
+        galleryImages.filter(uri => uri && !uri.startsWith('http')).map(uri => uploadImage(uri))
       );
 
       const newGalleryDocIds = await Promise.all(
         uploadedGalleryUrls.map(url => 
-            databases.createDocument(
-                config.databaseId!,
-                config.galleriesCollectionId!,
-                ID.unique(),
-                { image: url }
-            ).then(doc => doc.$id)
+            databases.createDocument(config.databaseId!, config.galleriesCollectionId!, ID.unique(), { image: url })
+            .then(doc => doc.$id)
         )
       );
 
@@ -115,30 +111,14 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
       const allGalleryIds = [...existingGalleryIds, ...newGalleryDocIds];
 
       const productData = {
-        name,
-        price: parseFloat(price),
-        description,
-        type,
-        image: mainImageUrl,
-        gallery: allGalleryIds,
-        agentId: user?.$id,
-        status: 'active'
+        name, price: parseFloat(price), description, type, image: mainImageUrl,
+        gallery: allGalleryIds, agentId: user?.$id, status: 'active'
       };
 
       if (mode === 'edit' && initialData?.$id) {
-        await databases.updateDocument(
-          config.databaseId!,
-          config.stokCollectionId!,
-          initialData.$id,
-          productData
-        );
+        await databases.updateDocument(config.databaseId!, config.stokCollectionId!, initialData.$id, productData);
       } else {
-        await databases.createDocument(
-          config.databaseId!,
-          config.stokCollectionId!,
-          ID.unique(),
-          productData
-        );
+        await databases.createDocument(config.databaseId!, config.stokCollectionId!, ID.unique(), productData);
       }
 
       Alert.alert('Sukses', `Produk berhasil ${mode === 'edit' ? 'diperbarui' : 'ditambahkan'}`);
@@ -152,22 +132,19 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
   };
 
   return (
-    <View className="bg-white p-4 rounded-lg shadow-sm space-y-4">
-      <Text className="text-2xl font-rubik-bold mb-4 text-black-300">
-        {mode === 'edit' ? 'Edit Produk' : 'Tambah Produk Baru'}
-      </Text>
-
-      {/* Form Fields (Nama, Tipe, Harga, Deskripsi) - Tidak ada perubahan */}
-      <View>
-        <Text className="text-sm font-rubik-medium text-black-300 mb-1">Nama Produk</Text>
-        <TextInput className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik" placeholder="Masukkan nama produk" value={name} onChangeText={setName} />
+    <View style={styles.formContainer}>
+      
+      {/* --- FORM FIELDS --- */}
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Nama Produk *</Text>
+        <TextInput style={styles.input} placeholder="Contoh: Kaos Sasak Modern" value={name} onChangeText={setName} />
       </View>
 
-      <View>
-          <Text className="text-sm font-rubik-medium text-black-300 mb-1">Tipe Produk</Text>
-          <View className="border border-gray-200 rounded-lg">
-            <Picker selectedValue={type} onValueChange={(itemValue) => setType(itemValue)}>
-                <Picker.Item label="Pilih Tipe Produk..." value={undefined} enabled={false} style={{color: 'grey'}} />
+      <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Tipe Produk *</Text>
+          <View style={styles.pickerContainer}>
+            <Picker selectedValue={type} onValueChange={(itemValue) => setType(itemValue)} style={styles.picker}>
+                <Picker.Item label="Pilih Tipe..." value={undefined} enabled={false} style={{color: 'grey'}} />
                 {productTypes.map((item, index) => (
                     <Picker.Item key={index} label={item} value={item} />
                 ))}
@@ -175,54 +152,155 @@ export const ProductForm = ({ onSuccess, initialData, mode = 'create' }: Product
           </View>
       </View>
 
-      <View>
-        <Text className="text-sm font-rubik-medium text-black-300 mb-1">Harga</Text>
-        <TextInput className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik" placeholder="Masukkan harga" value={price} onChangeText={setPrice} keyboardType="numeric" />
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Harga (Rp) *</Text>
+        <TextInput style={styles.input} placeholder="Contoh: 120000" value={price} onChangeText={setPrice} keyboardType="numeric" />
       </View>
 
-      <View>
-        <Text className="text-sm font-rubik-medium text-black-300 mb-1">Deskripsi</Text>
-        <TextInput className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik h-24" placeholder="Masukkan deskripsi" value={description} onChangeText={setDescription} multiline textAlignVertical="top" />
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Deskripsi *</Text>
+        <TextInput style={[styles.input, styles.textArea]} placeholder="Jelaskan detail produk Anda di sini..." value={description} onChangeText={setDescription} multiline />
       </View>
 
-      {/* --- UI IMAGE PICKER BARU --- */}
-      <View>
-        <Text className="text-sm font-rubik-medium text-black-300 mb-2">Gambar Utama</Text>
-        <TouchableOpacity onPress={() => handleImagePick(setMainImage, { multiple: false })} className="border border-dashed border-gray-400 p-4 rounded-xl items-center justify-center h-48 bg-gray-50">
+      {/* --- IMAGE PICKERS --- */}
+      <View style={styles.fieldGroup}>
+        <Text style={styles.label}>Gambar Utama *</Text>
+        <TouchableOpacity onPress={() => handleImagePick(setMainImage, { multiple: false })} style={styles.imagePicker}>
           {mainImage ? (
-            <Image source={{ uri: mainImage }} className="w-full h-full rounded-xl" resizeMode="cover" />
+            <Image source={{ uri: mainImage }} style={styles.imagePreview} resizeMode="cover" />
           ) : (
-            <View className="items-center">
-              <Ionicons name="cloud-upload-outline" size={40} color="gray" />
-              <Text className="text-gray-500 mt-2">Ketuk untuk Pilih Gambar Utama</Text>
+            <View style={styles.uploadPlaceholder}>
+              <Ionicons name="cloud-upload-outline" size={40} color="#9CA3AF" />
+              <Text style={styles.uploadText}>Ketuk untuk Pilih Gambar</Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
       
-      <View>
-          <Text className="text-sm font-rubik-medium text-black-300 mb-2">Galeri Gambar</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
+      <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Galeri Gambar</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {galleryImages.map((uri, index) => (
-                  <View key={index} className="relative">
-                      <Image source={{ uri }} className="w-24 h-24 rounded-lg" />
+                  <View key={index} style={styles.galleryItem}>
+                      <Image source={{ uri }} style={styles.galleryImage} />
                       <TouchableOpacity
                           onPress={() => setGalleryImages(prev => prev.filter((_, i) => i !== index))}
-                          className="absolute -top-1 -right-1 bg-red-500 rounded-full p-1"
+                          style={styles.deleteIcon}
                       >
-                         <Ionicons name="close" size={12} color="white" />
+                         <Ionicons name="close-circle" size={24} color="#DC2626" />
                       </TouchableOpacity>
                   </View>
               ))}
-              <TouchableOpacity onPress={() => handleImagePick(setGalleryImages, { multiple: true })} className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg items-center justify-center bg-gray-50">
-                  <Ionicons name="add" size={30} color="gray" />
+              <TouchableOpacity onPress={() => handleImagePick(setGalleryImages, { multiple: true })} style={[styles.imagePicker, styles.addGalleryButton]}>
+                  <Ionicons name="add" size={40} color="#9CA3AF" />
               </TouchableOpacity>
           </ScrollView>
       </View>
 
-      <TouchableOpacity onPress={handleSubmit} disabled={loading} className={`w-full py-3 rounded-lg mt-4 ${loading ? 'bg-gray-400' : 'bg-primary-300'}`}>
-        {loading ? <ActivityIndicator color="white" /> : <Text className="text-center text-white font-rubik-bold">{mode === 'edit' ? 'Simpan Perubahan' : 'Tambah Produk'}</Text>}
+      {/* --- SUBMIT BUTTON --- */}
+      <TouchableOpacity onPress={handleSubmit} disabled={loading} style={styles.submitButton}>
+        {loading ? (
+            <ActivityIndicator color="white" /> 
+        ) : (
+            <Text style={styles.submitButtonText}>{mode === 'edit' ? 'Simpan Perubahan' : 'Tambah Produk'}</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
 };
+
+// --- STYLESHEET UNTUK TAMPILAN MODERN ---
+const styles = StyleSheet.create({
+    formContainer: {
+        padding: 16,
+    },
+    fieldGroup: {
+        marginBottom: 20,
+    },
+    label: {
+        fontSize: 14,
+        fontFamily: 'Rubik-Medium',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+        fontFamily: 'Rubik-Regular',
+        color: '#1F2937',
+    },
+    textArea: {
+        height: 120,
+        textAlignVertical: 'top',
+    },
+    pickerContainer: {
+        backgroundColor: '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+    },
+    picker: {
+        // Styling untuk picker mungkin terbatas, tetapi container membantu
+    },
+    imagePicker: {
+        borderWidth: 2,
+        borderColor: '#D1D5DB',
+        borderStyle: 'dashed',
+        borderRadius: 12,
+        height: 180,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#F9FAFB',
+        overflow: 'hidden',
+    },
+    uploadPlaceholder: {
+        alignItems: 'center',
+    },
+    uploadText: {
+        marginTop: 8,
+        fontFamily: 'Rubik-Regular',
+        color: '#6B7280',
+    },
+    imagePreview: {
+        width: '100%',
+        height: '100%',
+    },
+    galleryItem: {
+        width: 100,
+        height: 100,
+        marginRight: 12,
+    },
+    galleryImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 12,
+    },
+    deleteIcon: {
+        position: 'absolute',
+        top: -8,
+        right: -8,
+        backgroundColor: 'white',
+        borderRadius: 12,
+    },
+    addGalleryButton: {
+        width: 100,
+        height: 100,
+    },
+    submitButton: {
+        backgroundColor: '#526346',
+        paddingVertical: 16,
+        borderRadius: 99,
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    submitButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontFamily: 'Rubik-Bold',
+    },
+});

@@ -15,8 +15,9 @@ import cart from "@/assets/icons/shopping-cart.png";
 import alamat from "@/assets/icons/alamat.png";
 import leftArrow from "@/assets/icons/left-arrow.png";
 import lock from "@/assets/icons/lock.png";
-
-
+import editing from "@/assets/icons/editing.png";
+import news from "@/assets/icons/news.png";
+import scanner from "@/assets/icons/scanner.png";
 
 export default {
   google,
@@ -36,4 +37,7 @@ export default {
   alamat,
   leftArrow,
   lock,
+  editing,
+  news,
+  scanner,
 };
