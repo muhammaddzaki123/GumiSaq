@@ -3,9 +3,9 @@ import { useGlobalContext } from '@/lib/global-provider';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Query } from 'react-native-appwrite';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Query } from 'react-native-appwrite';
 
 // Tipe data untuk statistik
 interface SalesStats {
@@ -33,7 +33,7 @@ const StatCard = ({ icon, value, label, color }: { icon: any, value: string | nu
 // Komponen untuk Bar Chart sederhana
 const BarChart = ({ data }: { data: SalesStats['topProducts'] }) => {
   if (!data || data.length === 0) return null;
-  const maxValue = Math.max(...data.map(p => p.totalSold));
+  const maxValue = Math.max(...data.map(p => p.totalSold), 1); // Hindari pembagian dengan nol
 
   return (
     <View style={styles.chartContainer}>
@@ -43,13 +43,12 @@ const BarChart = ({ data }: { data: SalesStats['topProducts'] }) => {
           <View style={styles.barBackground}>
             <View style={[styles.bar, { width: `${(product.totalSold / maxValue) * 100}%` }]} />
           </View>
-          <Text style={styles.barValue}>{product.totalSold} terjual</Text>
+          <Text style={styles.barValue}>{product.totalSold} terjual (Rp {product.revenue.toLocaleString('id-ID')})</Text>
         </View>
       ))}
     </View>
   );
 };
-
 
 export default function AgentReports() {
   const router = useRouter();
@@ -68,29 +67,33 @@ export default function AgentReports() {
 
   const loadStats = async () => {
     if (!user) return;
-    setLoading(true);
     try {
         // Ambil semua produk milik agen
-        const productsResponse = await databases.listDocuments(config.databaseId!, config.stokCollectionId!, [Query.equal('agentId', user.$id)]);
-        const agentProductIds = new Set(productsResponse.documents.map(p => p.$id));
+        const productsResponse = await databases.listDocuments(config.databaseId!, config.stokCollectionId!, [Query.equal('agentId', user.$id), Query.limit(5000)]);
+        const agentProducts = productsResponse.documents;
+        const agentProductIds = new Set(agentProducts.map(p => p.$id));
         const totalProducts = productsResponse.total;
 
-        // Ambil semua item pesanan, lalu filter yang relevan
-        const orderItemsResponse = await databases.listDocuments(config.databaseId!, config.orderItemsCollectionId!, [Query.limit(5000)]);
-        const agentOrderItems = orderItemsResponse.documents.filter(item => agentProductIds.has(item.productId));
+        if (agentProductIds.size === 0) {
+            setStats({ totalSales: 0, totalOrders: 0, completedOrders: 0, pendingOrders: 0, totalProducts, topProducts: [] });
+            return;
+        }
 
-        // Ambil pesanan yang relevan
+        // Ambil semua item pesanan yang terkait dengan produk agen
+        const orderItemsResponse = await databases.listDocuments(config.databaseId!, config.orderItemsCollectionId!, [Query.equal('productId', Array.from(agentProductIds)), Query.limit(5000)]);
+        const agentOrderItems = orderItemsResponse.documents;
+
         const relevantOrderIds = [...new Set(agentOrderItems.map(item => item.orderId))];
-        if(relevantOrderIds.length === 0) {
-             setStats({ totalSales: 0, totalOrders: 0, completedOrders: 0, pendingOrders: 0, totalProducts, topProducts: [] });
-             return;
+        if (relevantOrderIds.length === 0) {
+            setStats({ totalSales: 0, totalOrders: 0, completedOrders: 0, pendingOrders: 0, totalProducts, topProducts: [] });
+            return;
         }
         
-        const ordersResponse = await databases.listDocuments(config.databaseId!, config.ordersCollectionId!, [Query.equal('$id', relevantOrderIds)]);
+        const ordersResponse = await databases.listDocuments(config.databaseId!, config.ordersCollectionId!, [Query.equal('$id', relevantOrderIds), Query.limit(5000)]);
         
         const salesByProduct: Record<string, { totalSold: number; revenue: number; name: string }> = {};
-
         let totalSales = 0;
+
         ordersResponse.documents.forEach(order => {
             if (order.status === 'delivered') {
                 const itemsInOrder = agentOrderItems.filter(item => item.orderId === order.$id);
@@ -99,8 +102,8 @@ export default function AgentReports() {
                     totalSales += price;
                     
                     if (!salesByProduct[item.productId]) {
-                        const product = productsResponse.documents.find(p => p.$id === item.productId);
-                        salesByProduct[item.productId] = { totalSold: 0, revenue: 0, name: product?.name || 'Unknown' };
+                        const product = agentProducts.find(p => p.$id === item.productId);
+                        salesByProduct[item.productId] = { totalSold: 0, revenue: 0, name: product?.name || 'Produk Dihapus' };
                     }
                     salesByProduct[item.productId].totalSold += item.quantity;
                     salesByProduct[item.productId].revenue += price;
@@ -127,6 +130,7 @@ export default function AgentReports() {
         setRefreshing(false);
     }
   };
+
 
   const onRefresh = () => {
     setRefreshing(true);
