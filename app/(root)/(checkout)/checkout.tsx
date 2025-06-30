@@ -31,6 +31,14 @@ interface MergedCartItem extends Models.Document {
   quantity: number;
 }
 
+// Opsi Metode Pembayaran
+const PAYMENT_METHODS = [
+    { id: 'cod', name: 'COD (Cash On Delivery)', icon: 'wallet-outline' },
+    { id: 'bank', name: 'Transfer Bank', icon: 'server-outline' },
+    { id: 'ewallet', name: 'E-Wallet', icon: 'card-outline' },
+];
+
+
 const CheckoutScreen = () => {
   const { user } = useGlobalContext();
   const params = useLocalSearchParams<{ 
@@ -43,13 +51,14 @@ const CheckoutScreen = () => {
 
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  // State baru untuk metode pembayaran
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | null>(null);
   
   const { data: addresses, refetch: refetchAddresses } = useAppwrite({
     fn: () => getUserAddresses(user!.$id),
     skip: !user,
   });
 
-  // Hanya ambil data keranjang jika BUKAN pembelian langsung
   const { data: cartItemsData, loading: cartLoading } = useAppwrite({
     fn: () => getCartItems(user!.$id),
     skip: !user || !!params.isDirectBuy,
@@ -65,7 +74,7 @@ const CheckoutScreen = () => {
           price: parseFloat(params.productPrice || '0'),
         },
         quantity: 1,
-        isCustom: false, // Tandai ini bukan kustom
+        isCustom: false,
       }];
     }
     return cartItemsData as MergedCartItem[];
@@ -107,9 +116,16 @@ const CheckoutScreen = () => {
       Alert.alert("Alamat Kosong", "Pilih atau tambahkan alamat pengiriman.");
       return;
     }
+    // Validasi metode pembayaran
+    if (!selectedPaymentMethod) {
+      Alert.alert("Metode Pembayaran", "Silakan pilih metode pembayaran.");
+      return;
+    }
+
 
     setIsPlacingOrder(true);
     try {
+      // Anda bisa meneruskan `selectedPaymentMethod` ke fungsi createOrder jika diperlukan di backend
       const orderId = await createOrder(user.$id, selectedAddress, grandTotal, cartItems);
       router.replace({ pathname: "/order-confirmation", params: { orderId } });
     } catch (error: any) {
@@ -121,7 +137,6 @@ const CheckoutScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* ... (UI Header tetap sama) ... */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={{ padding: 8 }}>
           <Ionicons name="arrow-back" size={28} color="#191D31" />
@@ -131,7 +146,6 @@ const CheckoutScreen = () => {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 180 }}>
-        {/* ... (UI Alamat Pengiriman tetap sama) ... */}
         <View style={{ paddingHorizontal: 20 }}>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Alamat Pengiriman</Text>
@@ -156,7 +170,6 @@ const CheckoutScreen = () => {
               </TouchableOpacity>
             </View>
 
-          {/* Ringkasan Item */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Ringkasan Pesanan</Text>
             {cartLoading && !params.isDirectBuy? <ActivityIndicator/> : (
@@ -172,7 +185,37 @@ const CheckoutScreen = () => {
                 ))
             )}
           </View>
-          {/* ... (UI Rincian Pembayaran tetap sama) ... */}
+
+          {/* --- AWAL BAGIAN METODE PEMBAYARAN --- */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Metode Pembayaran</Text>
+            <View style={styles.paymentMethodContainer}>
+              {PAYMENT_METHODS.map(method => (
+                <TouchableOpacity
+                  key={method.id}
+                  style={[
+                    styles.paymentMethodButton,
+                    selectedPaymentMethod === method.id && styles.paymentMethodSelected
+                  ]}
+                  onPress={() => setSelectedPaymentMethod(method.id)}
+                >
+                  <Ionicons 
+                    name={method.icon as any} 
+                    size={24} 
+                    color={selectedPaymentMethod === method.id ? '#526346' : '#666'} 
+                  />
+                  <Text style={[
+                    styles.paymentMethodText,
+                    selectedPaymentMethod === method.id && styles.paymentMethodTextSelected
+                  ]}>
+                    {method.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          {/* --- AKHIR BAGIAN METODE PEMBAYARAN --- */}
+
           <View style={[styles.section, { backgroundColor: 'white', padding: 20, borderRadius: 16, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 }]}>
               <Text style={styles.sectionTitle}>Rincian Pembayaran</Text>
               <View style={styles.summaryRow}>
@@ -192,7 +235,6 @@ const CheckoutScreen = () => {
         </View>
       </ScrollView>
 
-       {/* ... (UI Footer tetap sama) ... */}
        <View style={styles.footer}>
         <TouchableOpacity
           onPress={handlePlaceOrder}
@@ -210,7 +252,7 @@ const CheckoutScreen = () => {
   );
 };
 
-// ... (Styles tetap sama)
+// ... Stylesheet yang ada, dengan tambahan style untuk metode pembayaran
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     header: {
@@ -269,7 +311,39 @@ const styles = StyleSheet.create({
       borderRadius: 99,
       alignItems: 'center',
     },
-    primaryButtonText: { color: 'white', fontSize: 16, fontFamily: 'Rubik-Bold' }
+    primaryButtonText: { color: 'white', fontSize: 16, fontFamily: 'Rubik-Bold' },
+
+    // --- STYLE BARU UNTUK METODE PEMBAYARAN ---
+    paymentMethodContainer: {
+      backgroundColor: 'white',
+      borderRadius: 12,
+      padding: 8,
+      elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 
+    },
+    paymentMethodButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: '#EEE',
+      backgroundColor: '#F9F9F9'
+    },
+    paymentMethodSelected: {
+      backgroundColor: '#E8F5E9',
+      borderColor: '#526346',
+    },
+    paymentMethodText: {
+      marginLeft: 16,
+      fontSize: 16,
+      fontFamily: 'Rubik-Medium',
+      color: '#666'
+    },
+    paymentMethodTextSelected: {
+      color: '#526346'
+    }
   });
 
 export default CheckoutScreen;
