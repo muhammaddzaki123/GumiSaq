@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import icons from "@/constants/icons";
 import images from "@/constants/images";
-import { loginUser } from "@/lib/appwrite";
+import { getCurrentUser, loginUser, logout } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 
 export default function SignIn() {
@@ -27,6 +27,7 @@ export default function SignIn() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Redirect if already logged in
   React.useEffect(() => {
     if (!loading && isLogged) {
       router.replace("/");
@@ -34,19 +35,48 @@ export default function SignIn() {
   }, [loading, isLogged]);
 
   const handleLogin = async () => {
+    // Basic validation
     if (!email || !password) {
       Alert.alert("Error", "Email dan password harus diisi.");
       return;
     }
+
     setIsSubmitting(true);
+    
     try {
+      // Step 1: Attempt to log in with the provided credentials.
       await loginUser(email, password);
+
+      // Step 2: After successful authentication, fetch the user's full profile.
+      const currentUser = await getCurrentUser();
+
+      // Step 3: Check the user's role.
+      if (currentUser?.userType === 'admin') {
+        // Step 4: If the user is an admin, prevent login.
+        // Log them out immediately and show an alert.
+        await logout();
+        Alert.alert(
+          "Login Gagal",
+          "Akun admin tidak diizinkan masuk melalui aplikasi ini."
+        );
+        // Stop the submission process here.
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Step 5: If the user is not an admin, proceed as normal.
+      // Refetch global context to update user state and redirect.
       await refetch();
       router.replace("/");
+
     } catch (error: any) {
+      // Handle login errors (e.g., wrong password, user not found).
       Alert.alert("Error Login", error.message || "Terjadi kesalahan saat mencoba masuk.");
     } finally {
-      setIsSubmitting(false);
+      // Ensure the submitting state is reset in all cases, except for the admin block above.
+      if (isSubmitting) {
+         setIsSubmitting(false);
+      }
     }
   };
 

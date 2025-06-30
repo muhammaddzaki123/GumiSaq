@@ -141,7 +141,7 @@ export async function getCurrentUser() {
  */
 export async function logout() {
   try {
-    return await account.deleteSession("current");
+    return await account.deleteSessions();
   } catch (error: any) {
     console.error("Error saat logout:", error.message);
     throw new Error("Gagal untuk logout.");
@@ -763,9 +763,7 @@ export const createOrder = async (userId: string, shippingAddress: string, total
     });
 
     await Promise.all(orderItemPromises);
-    
-    // --- PERBAIKAN UTAMA DI SINI ---
-    // Hanya coba hapus item yang memiliki $id (berasal dari keranjang asli)
+
     const itemsToDelete = cartItems.filter(item => item.$id);
     if (itemsToDelete.length > 0) {
       const deletePromises = itemsToDelete.map(item => 
@@ -773,7 +771,6 @@ export const createOrder = async (userId: string, shippingAddress: string, total
       );
       await Promise.all(deletePromises);
     }
-    // ------------------------------------
 
     return newOrder.$id;
   } catch (error: any) {

@@ -14,7 +14,7 @@ import {
   View,
 } from "react-native";
 
-// Komponen Item Menu yang bisa digunakan kembali
+// Komponen Item Menu yang bisa digunakan kembali (tidak ada perubahan)
 const MenuItem = ({ icon, title, onPress, isDestructive = false }: {
   icon: any; // `any` agar bisa menerima nama ikon dari Ionicons
   title: string;
@@ -35,22 +35,32 @@ const MenuItem = ({ icon, title, onPress, isDestructive = false }: {
 const ProfileScreen = () => {
   const { user, refetch } = useGlobalContext();
 
-  const handleLogout = async () => {
+  // --- PERBAIKAN LOGIKA LOGOUT DI SINI ---
+  const handleLogout = () => {
+    // Menampilkan dialog konfirmasi kepada pengguna
     Alert.alert(
       "Logout",
-      "Apakah Anda yakin ingin keluar?",
+      "Apakah Anda yakin ingin keluar dari akun Anda?",
       [
         { text: "Batal", style: "cancel" },
         {
           text: "Keluar",
           style: "destructive",
+          // Menggunakan async/await di dalam `onPress`
           onPress: async () => {
-            const result = await logout();
-            if (result) {
+            try {
+              // Memanggil fungsi logout yang sudah diperbarui (menggunakan deleteSessions)
+              await logout();
+              
+              // Merefresh state global untuk menghapus data pengguna
               await refetch();
+              
+              // Mengarahkan pengguna kembali ke halaman sign-in
               router.replace('/sign-in');
-            } else {
-              Alert.alert("Error", "Gagal untuk logout.");
+
+            } catch (error: any) {
+              // Menampilkan pesan error jika logout gagal
+              Alert.alert("Error", error.message || "Gagal untuk logout.");
             }
           }
         }
@@ -66,7 +76,7 @@ const ProfileScreen = () => {
   
   const menuItemsApp = [
     { title: "Desain Saya", icon: "color-palette-outline", route: "/(desaign)/my-designs" },
-    { title: "Tentang Aplikasi", icon: "information-circle-outline", route: "/(about)/about" }, // Contoh rute
+    { title: "Tentang Aplikasi", icon: "information-circle-outline", route: "/(about)/about" },
   ];
 
   return (
