@@ -1,62 +1,70 @@
 import { Article } from '@/constants/article';
 import { getArticles } from '@/lib/appwrite';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface UseArticlesResult {
   articles: Article[];
   loading: boolean;
   error: string | null;
-  searchArticles: (query: string) => void;
-  filteredArticles: Article[];
+  // Kita tidak lagi mengekspor fungsi search, karena akan ditangani oleh hook
 }
 
-export const useArticles = (): UseArticlesResult => {
+// Hook sekarang menerima query dan kategori sebagai argumen
+export const useArticles = (query: string, category: string): UseArticlesResult => {
   const [articles, setArticles] = useState<Article[]>([]);
-  const [filteredArticles, setFilteredArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      setLoading(true);
       try {
         const fetchedArticles = await getArticles();
         const publishedArticles = (fetchedArticles as unknown as Article[]).filter(
           article => article.isPublished
         );
         setArticles(publishedArticles);
-        setFilteredArticles(publishedArticles);
       } catch (err) {
         console.error('Error fetching articles:', err);
-        setError('Failed to load articles. Please try again later.');
+        setError('Gagal memuat artikel. Coba lagi nanti.');
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, []); // Hanya dijalankan sekali saat komponen dimuat
 
-  const searchArticles = (query: string) => {
-    if (!query.trim()) {
-      setFilteredArticles(articles);
-      return;
+  // Gunakan useMemo untuk memfilter artikel secara efisien
+  // Ini hanya akan berjalan kembali jika `articles`, `query`, atau `category` berubah
+  const filteredArticles = useMemo(() => {
+    let tempArticles = articles;
+
+    // 1. Filter berdasarkan kategori
+    if (category && category !== "Semua") {
+      tempArticles = tempArticles.filter(article => 
+        article.category.toLowerCase() === category.toLowerCase()
+      );
     }
 
-    const searchQuery = query.toLowerCase().trim();
-    const filtered = articles.filter((article) => {
-      const titleMatch = article.title.toLowerCase().includes(searchQuery);
-      const descriptionMatch = article.description.toLowerCase().includes(searchQuery);
-      const contentMatch = article.content.toLowerCase().includes(searchQuery);
-      const categoryMatch = article.category.toLowerCase().includes(searchQuery);
-      const tagsMatch = article.tags.some(tag => 
-        tag.toLowerCase().includes(searchQuery)
-      );
+    // 2. Filter berdasarkan query pencarian
+    if (query && query.trim() !== "") {
+      const searchQuery = query.toLowerCase().trim();
+      tempArticles = tempArticles.filter((article) => {
+        const titleMatch = article.title.toLowerCase().includes(searchQuery);
+        const descriptionMatch = article.description.toLowerCase().includes(searchQuery);
+        const contentMatch = article.content.toLowerCase().includes(searchQuery);
+        const tagsMatch = article.tags.some(tag => 
+          tag.toLowerCase().includes(searchQuery)
+        );
+        return titleMatch || descriptionMatch || contentMatch || tagsMatch;
+      });
+    }
+    
+    return tempArticles;
 
-      return titleMatch || descriptionMatch || contentMatch || categoryMatch || tagsMatch;
-    });
+  }, [articles, query, category]);
 
-    setFilteredArticles(filtered);
-  };
-
-  return { articles, loading, error, searchArticles, filteredArticles };
+  // Kembalikan data yang sudah difilter
+  return { articles: filteredArticles, loading, error };
 };

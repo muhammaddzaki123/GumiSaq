@@ -1,14 +1,17 @@
-import React, { useState } from "react";
+import icons from "@/constants/icons";
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
 import { Image, TextInput, TouchableOpacity, View } from "react-native";
 import { useDebouncedCallback } from "use-debounce";
 
-import icons from "@/constants/icons";
-import { router, useLocalSearchParams, usePathname } from "expo-router";
-
 const Search = () => {
-  const path = usePathname();
   const params = useLocalSearchParams<{ query?: string }>();
-  const [search, setSearch] = useState(params.query);
+  const [search, setSearch] = useState(params.query || "");
+
+  useEffect(() => {
+    setSearch(params.query || "");
+  }, [params.query]);
 
   const debouncedSearch = useDebouncedCallback((text: string) => {
     router.setParams({ query: text });
@@ -17,6 +20,11 @@ const Search = () => {
   const handleSearch = (text: string) => {
     setSearch(text);
     debouncedSearch(text);
+  };
+
+  const clearSearch = () => {
+    setSearch("");
+    router.setParams({ query: "" });
   };
 
   return (
@@ -29,6 +37,12 @@ const Search = () => {
           placeholder="Search for anything"
           className="text-sm font-rubik text-black-300 ml-2 flex-1"
         />
+        {/* Tombol Hapus hanya muncul jika ada teks */}
+        {search.length > 0 && (
+          <TouchableOpacity onPress={clearSearch} className="pl-2">
+            <Ionicons name="close-circle" size={20} color="#9ca3af" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <TouchableOpacity>
