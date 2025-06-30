@@ -1,15 +1,26 @@
 import { config, databases } from '@/lib/appwrite';
 import { useGlobalContext } from '@/lib/global-provider';
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { Query } from 'react-native-appwrite';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Models, Query } from 'react-native-appwrite';
 
+// Tipe data yang dibutuhkan
 interface Order {
   $id: string;
   userId: string;
   totalAmount: number;
-  status: 'pending' | 'shipped' | 'delivered';
+  status: 'pending' | 'shipped' | 'delivered' | 'rejected'; // Menambahkan status rejected
   shippingAddress: string;
   createdAt: string;
   items?: OrderItem[];
@@ -28,11 +39,106 @@ interface OrderItem {
   };
 }
 
+// Komponen untuk menampilkan satu item produk di dalam kartu pesanan
+const OrderItemRow = ({ item }: { item: OrderItem }) => (
+  <View style={styles.itemRow}>
+    <Image
+      source={{ uri: item.product?.image || 'https://via.placeholder.com/150' }}
+      style={styles.itemImage}
+    />
+    <View style={styles.itemDetails}>
+      <Text style={styles.itemName} numberOfLines={2}>
+        {item.product?.name || 'Produk tidak ditemukan'}
+      </Text>
+      <Text style={styles.itemQuantity}>
+        {item.quantity}x @ Rp {item.priceAtPurchase.toLocaleString('id-ID')}
+      </Text>
+    </View>
+    <Text style={styles.itemTotal}>
+      Rp {(item.quantity * item.priceAtPurchase).toLocaleString('id-ID')}
+    </Text>
+  </View>
+);
+
+// Komponen Kartu Pesanan yang didesain ulang
+const OrderCard = ({ order, onUpdateStatus, onReject }: { order: Order, onUpdateStatus: (id: string, status: Order['status']) => void, onReject: (id: string) => void }) => {
+  const getStatusInfo = (status: Order['status']) => {
+    switch (status) {
+      case 'pending':
+        return { text: 'Pending', color: '#F59E0B', backgroundColor: '#FFFBEB' };
+      case 'shipped':
+        return { text: 'Dikirim', color: '#3B82F6', backgroundColor: '#EFF6FF' };
+      case 'delivered':
+        return { text: 'Selesai', color: '#10B981', backgroundColor: '#F0FDF4' };
+      case 'rejected':
+        return { text: 'Ditolak', color: '#EF4444', backgroundColor: '#FEF2F2' };
+      default:
+        return { text: 'Unknown', color: '#6B7280', backgroundColor: '#F3F4F6' };
+    }
+  };
+
+  const statusInfo = getStatusInfo(order.status);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.orderId}>Order #{order.$id.slice(-6)}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: statusInfo.backgroundColor }]}>
+          <Text style={[styles.statusText, { color: statusInfo.color }]}>{statusInfo.text}</Text>
+        </View>
+      </View>
+      
+      <View style={styles.itemContainer}>
+        {order.items?.map((item) => (
+          <OrderItemRow key={item.$id} item={item} />
+        ))}
+      </View>
+      
+      <View style={styles.cardFooter}>
+         <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Tanggal Pesanan</Text>
+            <Text style={styles.totalValue}>{new Date(order.createdAt).toLocaleDateString('id-ID')}</Text>
+          </View>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValue}>Rp {order.totalAmount.toLocaleString('id-ID')}</Text>
+        </View>
+
+        {order.status === 'pending' && (
+          <View style={styles.actionsRow}>
+            <TouchableOpacity onPress={() => onReject(order.$id)} style={[styles.actionButton, styles.rejectButton]}>
+              <Text style={[styles.actionButtonText, styles.rejectButtonText]}>Tolak</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => onUpdateStatus(order.$id, 'shipped')} style={[styles.actionButton, styles.acceptButton]}>
+                <Ionicons name="checkmark-sharp" size={16} color="white" />
+              <Text style={[styles.actionButtonText, styles.acceptButtonText]}>Terima</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {order.status === 'shipped' && (
+          <TouchableOpacity onPress={() => onUpdateStatus(order.$id, 'delivered')} style={[styles.actionButton, styles.completeButton]}>
+             <Ionicons name="checkmark-done-sharp" size={16} color="white" />
+            <Text style={styles.actionButtonText}>Selesaikan Pesanan</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
+};
+
+const EmptyState = ({ message }: { message: string }) => (
+    <View style={styles.emptyContainer}>
+        <Ionicons name="file-tray-outline" size={64} color="#CBD5E0" />
+        <Text style={styles.emptyText}>{message}</Text>
+    </View>
+);
+
 export default function AgentOrders() {
   const router = useRouter();
   const { user } = useGlobalContext();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Order['status']>('pending');
 
   useEffect(() => {
     if (!user || (user.userType !== 'agent' && user.userType !== 'admin')) {
@@ -44,7 +150,7 @@ export default function AgentOrders() {
 
   const loadOrders = async () => {
     if (!user) return;
-    
+    setLoading(true);
     try {
       const response = await databases.listDocuments(
         config.databaseId!,
@@ -52,26 +158,26 @@ export default function AgentOrders() {
         [Query.orderDesc('$createdAt')]
       );
 
-      const ordersWithItems = await Promise.all(
-        response.documents.map(async (order) => {
+      const ordersWithItems: Order[] = await Promise.all(
+        response.documents.map(async (orderDoc: Models.Document) => {
           const itemsResponse = await databases.listDocuments(
             config.databaseId!,
             config.orderItemsCollectionId!,
-            [Query.equal('orderId', order.$id)]
+            [Query.equal('orderId', orderDoc.$id)]
           );
 
           const itemsWithProducts = await Promise.all(
             itemsResponse.documents.map(async (item) => {
               let product = null;
               try {
-                product = await databases.getDocument(
-                  config.databaseId!,
-                  config.stokCollectionId!,
-                  item.productId
-                );
-              } catch (e) {
-                // Produk tidak ditemukan
-              }
+                if (item.productId) {
+                    product = await databases.getDocument(
+                        config.databaseId!,
+                        config.stokCollectionId!,
+                        item.productId
+                    );
+                }
+              } catch (e) { console.warn(`Produk dengan ID ${item.productId} tidak ditemukan.`); }
 
               return {
                 $id: item.$id,
@@ -80,30 +186,28 @@ export default function AgentOrders() {
                 quantity: item.quantity,
                 priceAtPurchase: item.priceAtPurchase,
                 product: product
-                  ? {
-                      name: product.name,
-                      image: product.image,
-                      agentId: product.agentId?.$id || product.agentId
-                    }
+                  ? { name: product.name, image: product.image, agentId: product.agentId?.$id || product.agentId }
                   : undefined
               };
             })
           );
-
-          return {
-            $id: order.$id,
-            userId: order.userId,
-            totalAmount: order.totalAmount,
-            status: order.status,
-            shippingAddress: order.shippingAddress,
-            createdAt: order.$createdAt,
+          
+          // FIX: Explicitly create an object matching the Order interface
+          const newOrder: Order = {
+            $id: orderDoc.$id,
+            userId: orderDoc.userId,
+            totalAmount: orderDoc.totalAmount,
+            status: orderDoc.status,
+            shippingAddress: orderDoc.shippingAddress,
+            createdAt: orderDoc.$createdAt,
             items: itemsWithProducts
-          } as Order;
+          };
+          return newOrder;
         })
       );
 
-      const agentOrders = ordersWithItems.filter(order => 
-        order.items?.some(item => 
+      const agentOrders = ordersWithItems.filter(order =>
+        order.items?.some(item =>
           item.product && item.product.agentId === user.$id
         )
       );
@@ -111,12 +215,12 @@ export default function AgentOrders() {
       setOrders(agentOrders);
     } catch (error) {
       console.error('Error loading orders:', error);
-      Alert.alert('Error', 'Gagal memuat pesanan');
+      Alert.alert('Error', 'Gagal memuat pesanan.');
     } finally {
       setLoading(false);
     }
   };
-
+  
   const handleUpdateStatus = async (orderId: string, newStatus: Order['status']) => {
     try {
       await databases.updateDocument(
@@ -133,206 +237,144 @@ export default function AgentOrders() {
     }
   };
 
-  const handleRejectOrder = async (orderId: string) => {
-    try {
-      // Hapus semua order items terkait
-      const itemsResponse = await databases.listDocuments(
-        config.databaseId!,
-        config.orderItemsCollectionId!,
-        [Query.equal('orderId', orderId)]
-      );
-      await Promise.all(
-        itemsResponse.documents.map(item =>
-          databases.deleteDocument(
-            config.databaseId!,
-            config.orderItemsCollectionId!,
-            item.$id
-          )
-        )
-      );
-      // Hapus order
-      await databases.deleteDocument(
-        config.databaseId!,
-        config.ordersCollectionId!,
-        orderId
-      );
-      Alert.alert('Sukses', 'Pesanan berhasil ditolak dan dihapus');
-      loadOrders();
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      Alert.alert('Error', 'Gagal menghapus pesanan');
-    }
-  };
-
-  const getStatusColor = (status: Order['status']) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-500';
-      case 'shipped':
-        return 'bg-blue-500';
-      case 'delivered':
-        return 'bg-green-500';
-      default:
-        return 'bg-gray-500';
-    }
-  };
-
-  if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
-        <Text className="text-black-300 font-rubik">Memuat...</Text>
-      </View>
+  const handleRejectOrder = (orderId: string) => {
+    Alert.alert(
+      "Tolak Pesanan",
+      "Anda yakin ingin menolak pesanan ini? Aksi ini tidak dapat dibatalkan.",
+      [
+        { text: "Batal", style: "cancel" },
+        { text: "Tolak", style: "destructive", onPress: () => handleUpdateStatus(orderId, 'rejected')}
+      ]
     );
-  }
+  };
+
+  const filteredOrders = useMemo(() => orders.filter(order => order.status === activeTab), [orders, activeTab]);
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View style={styles.container}>
       <Stack.Screen
         options={{
           headerTitle: 'Kelola Pesanan',
-          headerTitleStyle: {
-            fontFamily: 'Rubik-Medium',
-          },
+          headerTitleStyle: { fontFamily: 'Rubik-Bold' },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#F8F9FA' },
         }}
       />
+      
+      {/* Tab Navigator */}
+      <View style={styles.tabContainer}>
+        {(['pending', 'shipped', 'delivered', 'rejected'] as Order['status'][]).map(tab => (
+            <TouchableOpacity 
+                key={tab}
+                onPress={() => setActiveTab(tab)}
+                style={[styles.tab, activeTab === tab && styles.activeTab]}
+            >
+                <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+                    {tab === 'shipped' ? 'Dikirim' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                </Text>
+            </TouchableOpacity>
+        ))}
+      </View>
 
-      <ScrollView className="flex-1 p-4">
-        {/* Pending Orders */}
-        <Text className="font-rubik-bold text-lg mb-2 text-black-300">Pesanan Pending</Text>
-        {orders.filter(order => order.status === 'pending').length === 0 ? (
-          <View className="bg-white p-6 rounded-xl items-center justify-center mb-6">
-            <Text className="text-black-200 font-rubik text-center">
-              Tidak ada pesanan pending
-            </Text>
-          </View>
-        ) : (
-          <View className="space-y-4 mb-8">
-            {orders.filter(order => order.status === 'pending').map((order) => (
-              <View
-                key={order.$id}
-                className="bg-white p-4 rounded-xl shadow-sm"
-              >
-                <View className="flex-row justify-between items-center mb-4">
-                  <Text className="font-rubik-bold text-black-300">
-                    Order #{order.$id.slice(-6)}
-                  </Text>
-                  <View className={`px-3 py-1 rounded-full ${getStatusColor(order.status)}`}>
-                    <Text className="text-white font-rubik text-sm">
-                      {order.status.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-                <View className="space-y-2 mb-4">
-                  {order.items?.map((item) => (
-                    <View key={item.$id} className="flex-row justify-between items-center">
-                      <View className="flex-1">
-                        <Text className="font-rubik text-black-300">
-                          {item.product?.name}
-                        </Text>
-                        <Text className="font-rubik text-black-200 text-sm">
-                          {item.quantity}x @ Rp {item.priceAtPurchase.toLocaleString('id-ID')}
-                        </Text>
-                      </View>
-                      <Text className="font-rubik-bold text-black-300">
-                        Rp {(item.quantity * item.priceAtPurchase).toLocaleString('id-ID')}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-                <View className="border-t border-gray-100 pt-4">
-                  <View className="flex-row justify-between items-center mb-4">
-                    <Text className="font-rubik text-black-200">Total</Text>
-                    <Text className="font-rubik-bold text-black-300">
-                      Rp {order.totalAmount.toLocaleString('id-ID')}
-                    </Text>
-                  </View>
-                  <View className="flex-row space-x-2">
-                    <TouchableOpacity
-                      onPress={() => handleUpdateStatus(order.$id, 'shipped')}
-                      className="flex-1 bg-blue-500 p-2 rounded-lg"
-                    >
-                      <Text className="text-white font-rubik text-center">
-                        Terima
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => handleRejectOrder(order.$id)}
-                      className="flex-1 bg-red-500 p-2 rounded-lg"
-                    >
-                      <Text className="text-white font-rubik text-center">
-                        Tolak
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Shipped Orders */}
-        <Text className="font-rubik-bold text-lg mb-2 text-black-300">Pesanan Dikirim</Text>
-        {orders.filter(order => order.status === 'shipped').length === 0 ? (
-          <View className="bg-white p-6 rounded-xl items-center justify-center">
-            <Text className="text-black-200 font-rubik text-center">
-              Tidak ada pesanan dikirim
-            </Text>
-          </View>
-        ) : (
-          <View className="space-y-4">
-            {orders.filter(order => order.status === 'shipped').map((order) => (
-              <View
-                key={order.$id}
-                className="bg-white p-4 rounded-xl shadow-sm"
-              >
-                <View className="flex-row justify-between items-center mb-4">
-                  <Text className="font-rubik-bold text-black-300">
-                    Order #{order.$id.slice(-6)}
-                  </Text>
-                  <View className={`px-3 py-1 rounded-full ${getStatusColor(order.status)}`}>
-                    <Text className="text-white font-rubik text-sm">
-                      {order.status.toUpperCase()}
-                    </Text>
-                  </View>
-                </View>
-                <View className="space-y-2 mb-4">
-                  {order.items?.map((item) => (
-                    <View key={item.$id} className="flex-row justify-between items-center">
-                      <View className="flex-1">
-                        <Text className="font-rubik text-black-300">
-                          {item.product?.name}
-                        </Text>
-                        <Text className="font-rubik text-black-200 text-sm">
-                          {item.quantity}x @ Rp {item.priceAtPurchase.toLocaleString('id-ID')}
-                        </Text>
-                      </View>
-                      <Text className="font-rubik-bold text-black-300">
-                        Rp {(item.quantity * item.priceAtPurchase).toLocaleString('id-ID')}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-                <View className="border-t border-gray-100 pt-4">
-                  <View className="flex-row justify-between items-center mb-4">
-                    <Text className="font-rubik text-black-200">Total</Text>
-                    <Text className="font-rubik-bold text-black-300">
-                      Rp {order.totalAmount.toLocaleString('id-ID')}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleUpdateStatus(order.$id, 'delivered')}
-                    className="bg-green-500 p-2 rounded-lg"
-                  >
-                    <Text className="text-white font-rubik text-center">
-                      Selesaikan Pesanan
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+      {loading ? (
+        <View style={styles.centeredView}>
+          <ActivityIndicator size="large" color="#526346" />
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {filteredOrders.length > 0 ? (
+            filteredOrders.map(order => (
+              <OrderCard key={order.$id} order={order} onUpdateStatus={handleUpdateStatus} onReject={handleRejectOrder}/>
+            ))
+          ) : (
+            <EmptyState message={`Tidak ada pesanan dengan status "${activeTab}"`} />
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 }
+
+// --- STYLESHEET BARU ---
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#F8F9FA' },
+    centeredView: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    tabContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        paddingHorizontal: 8,
+        paddingTop: 8,
+        paddingBottom: 12,
+        backgroundColor: 'white',
+        borderBottomWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    tab: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 99,
+    },
+    activeTab: {
+        backgroundColor: '#526346',
+    },
+    tabText: {
+        fontFamily: 'Rubik-Medium',
+        fontSize: 14,
+        color: '#374151',
+    },
+    activeTabText: {
+        color: 'white',
+    },
+    scrollContainer: { padding: 16, paddingBottom: 40 },
+    card: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        marginBottom: 16,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderColor: '#F3F4F6',
+    },
+    orderId: { fontFamily: 'Rubik-Bold', fontSize: 16, color: '#1F2937' },
+    statusBadge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99 },
+    statusText: { fontFamily: 'Rubik-Medium', fontSize: 12, textTransform: 'capitalize' },
+    itemContainer: { padding: 16, gap: 16 },
+    itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    itemImage: { width: 50, height: 50, borderRadius: 8, backgroundColor: '#F3F4F6' },
+    itemDetails: { flex: 1 },
+    itemName: { fontFamily: 'Rubik-Medium', color: '#1F2937' },
+    itemQuantity: { fontFamily: 'Rubik-Regular', color: '#6B7280', fontSize: 12, marginTop: 2 },
+    itemTotal: { fontFamily: 'Rubik-Bold', color: '#374151' },
+    cardFooter: { borderTopWidth: 1, borderColor: '#F3F4F6', padding: 16, paddingTop: 12 },
+    totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    totalLabel: { fontFamily: 'Rubik-Regular', color: '#6B7280' },
+    totalValue: { fontFamily: 'Rubik-Bold', color: '#1F2937', fontSize: 16 },
+    actionsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    actionButton: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 12, gap: 8 },
+    actionButtonText: { fontFamily: 'Rubik-Bold', fontSize: 14, color: 'white' },
+    acceptButton: { backgroundColor: '#10B981' },
+    acceptButtonText: { color: 'white' },
+    rejectButton: { backgroundColor: '#FEF2F2' },
+    rejectButtonText: { color: '#DC2626' },
+    completeButton: { backgroundColor: '#3B82F6', marginTop: 12 },
+    emptyContainer: {
+        marginTop: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 16,
+    },
+    emptyText: {
+        fontFamily: 'Rubik-Medium',
+        fontSize: 16,
+        color: '#6B7280',
+        textAlign: 'center',
+    }
+});
