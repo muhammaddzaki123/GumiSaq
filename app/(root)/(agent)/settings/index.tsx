@@ -1,9 +1,21 @@
-import { Stack, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { config, databases } from '@/lib/appwrite';
 import { useGlobalContext } from '@/lib/global-provider';
+import { Ionicons } from '@expo/vector-icons';
+import { Stack, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+// Tipe data untuk profil agen
 interface AgentProfile {
   name: string;
   phone: string;
@@ -11,6 +23,28 @@ interface AgentProfile {
   address?: string;
   businessHours?: string;
 }
+
+// Komponen input yang bisa digunakan kembali
+const FormInput = ({ label, value, onChangeText, placeholder, multiline = false, keyboardType = 'default' }: {
+  label: string;
+  value: string | undefined;
+  onChangeText: (text: string) => void;
+  placeholder: string;
+  multiline?: boolean;
+  keyboardType?: 'default' | 'phone-pad';
+}) => (
+  <View style={styles.inputGroup}>
+    <Text style={styles.label}>{label}</Text>
+    <TextInput
+      style={[styles.input, multiline && styles.textArea]}
+      placeholder={placeholder}
+      value={value}
+      onChangeText={onChangeText}
+      multiline={multiline}
+      keyboardType={keyboardType}
+    />
+  </View>
+);
 
 export default function AgentSettings() {
   const router = useRouter();
@@ -35,14 +69,12 @@ export default function AgentSettings() {
 
   const loadProfile = async () => {
     if (!user) return;
-    
     try {
       const doc = await databases.getDocument(
         config.databaseId!,
         config.agentsCollectionId!,
         user.$id
       );
-
       setProfile({
         name: doc.name || '',
         phone: doc.phone || '',
@@ -60,14 +92,12 @@ export default function AgentSettings() {
 
   const handleSave = async () => {
     if (!user) return;
-    
     if (!profile.name.trim() || !profile.phone.trim()) {
-      Alert.alert('Error', 'Nama toko dan nomor telepon harus diisi');
+      Alert.alert('Error', 'Nama toko dan nomor telepon wajib diisi.');
       return;
     }
-
+    setSaving(true);
     try {
-      setSaving(true);
       await databases.updateDocument(
         config.databaseId!,
         config.agentsCollectionId!,
@@ -80,112 +110,139 @@ export default function AgentSettings() {
           businessHours: profile.businessHours?.trim() || ''
         }
       );
-      Alert.alert('Sukses', 'Profil berhasil diperbarui');
+      Alert.alert('Sukses', 'Profil berhasil diperbarui!');
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Gagal menyimpan profil');
+      Alert.alert('Error', 'Gagal menyimpan profil.');
     } finally {
       setSaving(false);
     }
   };
+  
+  const setProfileValue = (key: keyof AgentProfile, value: string) => {
+    setProfile(prev => ({ ...prev, [key]: value }));
+  };
 
   if (loading) {
     return (
-      <View className="flex-1 items-center justify-center bg-gray-50">
-        <Text className="text-black-300 font-rubik">Memuat...</Text>
+      <View style={styles.centeredView}>
+        <ActivityIndicator size="large" color="#526346" />
+        <Text style={styles.loadingText}>Memuat Pengaturan...</Text>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
           headerTitle: 'Pengaturan Toko',
-          headerTitleStyle: {
-            fontFamily: 'Rubik-Medium',
-          },
+          headerTitleStyle: { fontFamily: 'Rubik-Bold' },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#F8F9FA' },
         }}
       />
 
-      <ScrollView className="flex-1 p-4">
-        <View className="bg-white p-4 rounded-xl shadow-sm space-y-4">
-          <View>
-            <Text className="font-rubik-medium text-black-300 mb-1">
-              Nama Toko *
-            </Text>
-            <TextInput
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik"
-              placeholder="Masukkan nama toko"
-              value={profile.name}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, name: text }))}
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.formContainer}>
+            <FormInput 
+                label="Nama Toko *"
+                value={profile.name}
+                onChangeText={(text) => setProfileValue('name', text)}
+                placeholder="Masukkan nama toko Anda"
             />
-          </View>
-
-          <View>
-            <Text className="font-rubik-medium text-black-300 mb-1">
-              Nomor Telepon *
-            </Text>
-            <TextInput
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik"
-              placeholder="Masukkan nomor telepon"
-              value={profile.phone}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, phone: text }))}
-              keyboardType="phone-pad"
+            <FormInput 
+                label="Nomor Telepon *"
+                value={profile.phone}
+                onChangeText={(text) => setProfileValue('phone', text)}
+                placeholder="cth: 08123456789"
+                keyboardType='phone-pad'
             />
-          </View>
-
-          <View>
-            <Text className="font-rubik-medium text-black-300 mb-1">
-              Deskripsi Toko
-            </Text>
-            <TextInput
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik"
-              placeholder="Masukkan deskripsi toko"
-              value={profile.description}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, description: text }))}
-              multiline
-              numberOfLines={4}
+             <FormInput 
+                label="Deskripsi Toko"
+                value={profile.description}
+                onChangeText={(text) => setProfileValue('description', text)}
+                placeholder="Jelaskan sedikit tentang toko Anda"
+                multiline
             />
-          </View>
-
-          <View>
-            <Text className="font-rubik-medium text-black-300 mb-1">
-              Alamat
-            </Text>
-            <TextInput
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik"
-              placeholder="Masukkan alamat toko"
-              value={profile.address}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, address: text }))}
-              multiline
-              numberOfLines={3}
+             <FormInput 
+                label="Alamat Toko"
+                value={profile.address}
+                onChangeText={(text) => setProfileValue('address', text)}
+                placeholder="Masukkan alamat lengkap toko"
+                multiline
             />
-          </View>
-
-          <View>
-            <Text className="font-rubik-medium text-black-300 mb-1">
-              Jam Operasional
-            </Text>
-            <TextInput
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg font-rubik"
-              placeholder="Contoh: Senin-Jumat, 09:00-17:00"
-              value={profile.businessHours}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, businessHours: text }))}
+             <FormInput 
+                label="Jam Operasional"
+                value={profile.businessHours}
+                onChangeText={(text) => setProfileValue('businessHours', text)}
+                placeholder="cth: Senin - Sabtu, 09:00 - 17:00"
             />
-          </View>
-
-          <TouchableOpacity
-            onPress={handleSave}
-            disabled={saving}
-            className={`w-full py-3 rounded-lg ${saving ? 'bg-gray-400' : 'bg-primary-300'}`}
-          >
-            <Text className="text-center text-white font-rubik-bold">
-              {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
-            </Text>
-          </TouchableOpacity>
+            
+            <TouchableOpacity
+                onPress={handleSave}
+                disabled={saving}
+                style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+            >
+                {saving ? (
+                    <ActivityIndicator color="white" />
+                ) : (
+                    <>
+                        <Ionicons name="save-outline" size={18} color="white" />
+                        <Text style={styles.saveButtonText}>Simpan Perubahan</Text>
+                    </>
+                )}
+            </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#F8F9FA' },
+    centeredView: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    loadingText: { marginTop: 10, fontFamily: 'Rubik-Medium', color: '#6B7280' },
+    scrollContainer: { paddingVertical: 16, paddingHorizontal: 20 },
+    formContainer: { backgroundColor: 'white', borderRadius: 16, padding: 20, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 10 },
+    inputGroup: { marginBottom: 20 },
+    label: {
+        fontSize: 14,
+        fontFamily: 'Rubik-Medium',
+        color: '#374151',
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: '#F9FAFB',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+        fontFamily: 'Rubik-Regular',
+        color: '#1F2937',
+    },
+    textArea: {
+        height: 100,
+        textAlignVertical: 'top',
+    },
+    saveButton: {
+        flexDirection: 'row',
+        gap: 8,
+        backgroundColor: '#526346',
+        paddingVertical: 16,
+        borderRadius: 99,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 16,
+    },
+    saveButtonDisabled: {
+        backgroundColor: '#A1A1AA', // Warna saat disabled
+    },
+    saveButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontFamily: 'Rubik-Bold',
+    },
+});

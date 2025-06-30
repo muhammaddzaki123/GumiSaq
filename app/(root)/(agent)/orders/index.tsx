@@ -14,13 +14,14 @@ import {
   View,
 } from 'react-native';
 import { Models, Query } from 'react-native-appwrite';
+import { SafeAreaView } from 'react-native-safe-area-context'; // <-- 1. Import SafeAreaView
 
-// Tipe data yang dibutuhkan
+// Tipe data (tidak berubah)
 interface Order {
   $id: string;
   userId: string;
   totalAmount: number;
-  status: 'pending' | 'shipped' | 'delivered' | 'rejected'; // Menambahkan status rejected
+  status: 'pending' | 'shipped' | 'delivered' | 'rejected';
   shippingAddress: string;
   createdAt: string;
   items?: OrderItem[];
@@ -39,7 +40,7 @@ interface OrderItem {
   };
 }
 
-// Komponen untuk menampilkan satu item produk di dalam kartu pesanan
+// Komponen-komponen UI (OrderCard, OrderItemRow, EmptyState) tetap sama...
 const OrderItemRow = ({ item }: { item: OrderItem }) => (
   <View style={styles.itemRow}>
     <Image
@@ -60,7 +61,6 @@ const OrderItemRow = ({ item }: { item: OrderItem }) => (
   </View>
 );
 
-// Komponen Kartu Pesanan yang didesain ulang
 const OrderCard = ({ order, onUpdateStatus, onReject }: { order: Order, onUpdateStatus: (id: string, status: Order['status']) => void, onReject: (id: string) => void }) => {
   const getStatusInfo = (status: Order['status']) => {
     switch (status) {
@@ -95,13 +95,17 @@ const OrderCard = ({ order, onUpdateStatus, onReject }: { order: Order, onUpdate
       </View>
       
       <View style={styles.cardFooter}>
+        <View style={styles.addressContainer}>
+            <Ionicons name="location-outline" size={16} color="#6B7280" />
+            <Text style={styles.addressText} numberOfLines={2}>{order.shippingAddress}</Text>
+        </View>
          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Tanggal Pesanan</Text>
+            <Text style={styles.totalLabel}>Tanggal</Text>
             <Text style={styles.totalValue}>{new Date(order.createdAt).toLocaleDateString('id-ID')}</Text>
           </View>
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>Rp {order.totalAmount.toLocaleString('id-ID')}</Text>
+          <Text style={[styles.totalValue, {fontSize: 18}]}>Rp {order.totalAmount.toLocaleString('id-ID')}</Text>
         </View>
 
         {order.status === 'pending' && (
@@ -133,6 +137,7 @@ const EmptyState = ({ message }: { message: string }) => (
     </View>
 );
 
+// Komponen utama (tidak berubah)
 export default function AgentOrders() {
   const router = useRouter();
   const { user } = useGlobalContext();
@@ -192,7 +197,6 @@ export default function AgentOrders() {
             })
           );
           
-          // FIX: Explicitly create an object matching the Order interface
           const newOrder: Order = {
             $id: orderDoc.$id,
             userId: orderDoc.userId,
@@ -251,7 +255,8 @@ export default function AgentOrders() {
   const filteredOrders = useMemo(() => orders.filter(order => order.status === activeTab), [orders, activeTab]);
 
   return (
-    <View style={styles.container}>
+    // 2. Mengganti View dengan SafeAreaView
+    <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
           headerTitle: 'Kelola Pesanan',
@@ -291,11 +296,11 @@ export default function AgentOrders() {
           )}
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
-// --- STYLESHEET BARU ---
+// Stylesheet (tidak berubah)
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FA' },
     centeredView: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -325,7 +330,11 @@ const styles = StyleSheet.create({
     activeTabText: {
         color: 'white',
     },
-    scrollContainer: { padding: 16, paddingBottom: 40 },
+    scrollContainer: { 
+        paddingHorizontal: 16, 
+        paddingTop: 16,
+        paddingBottom: 100 
+    },
     card: {
         backgroundColor: 'white',
         borderRadius: 16,
@@ -353,10 +362,25 @@ const styles = StyleSheet.create({
     itemName: { fontFamily: 'Rubik-Medium', color: '#1F2937' },
     itemQuantity: { fontFamily: 'Rubik-Regular', color: '#6B7280', fontSize: 12, marginTop: 2 },
     itemTotal: { fontFamily: 'Rubik-Bold', color: '#374151' },
-    cardFooter: { borderTopWidth: 1, borderColor: '#F3F4F6', padding: 16, paddingTop: 12 },
-    totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+    cardFooter: { borderTopWidth: 1, borderColor: '#F3F4F6', padding: 16, paddingTop: 12, gap: 8 },
+    addressContainer: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: 8,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderColor: '#F3F4F6',
+        marginBottom: 8,
+    },
+    addressText: {
+        flex: 1,
+        fontFamily: 'Rubik-Regular',
+        fontSize: 12,
+        color: '#6B7280',
+    },
+    totalRow: { flexDirection: 'row', justifyContent: 'space-between' },
     totalLabel: { fontFamily: 'Rubik-Regular', color: '#6B7280' },
-    totalValue: { fontFamily: 'Rubik-Bold', color: '#1F2937', fontSize: 16 },
+    totalValue: { fontFamily: 'Rubik-Bold', color: '#1F2937', fontSize: 14 },
     actionsRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
     actionButton: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10, borderRadius: 12, gap: 8 },
     actionButtonText: { fontFamily: 'Rubik-Bold', fontSize: 14, color: 'white' },
