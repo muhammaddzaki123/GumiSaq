@@ -773,3 +773,62 @@ export const createOrder = async (userId: string, shippingAddress: string, total
     throw new Error(error.message);
   }
 };
+
+export async function getAgentDashboardStats(agentId: string) {
+  try {
+    // 1. Ambil total produk
+    const productsResponse = await databases.listDocuments(
+      config.databaseId!,
+      config.stokCollectionId!,
+      [Query.equal('agentId', agentId), Query.limit(1)] // Cukup limit 1 untuk mendapatkan total
+    );
+    const totalProducts = productsResponse.total;
+
+    // 2. Ambil semua pesanan dan item untuk dihitung
+    const allOrders = await databases.listDocuments(
+      config.databaseId!,
+      config.ordersCollectionId!
+    );
+    const allOrderItems = await databases.listDocuments(
+      config.databaseId!,
+      config.orderItemsCollectionId!,
+      [Query.limit(5000)] // Ambil item sebanyak mungkin
+    );
+
+    // Buat Set ID produk milik agen untuk pencarian cepat
+    const agentProductIds = new Set(
+      (await databases.listDocuments(
+        config.databaseId!,
+        config.stokCollectionId!,
+        [Query.equal('agentId', agentId), Query.select(['$id'])]
+      )).documents.map(p => p.$id)
+    );
+
+    let pendingOrdersCount = 0;
+    let totalSales = 0;
+
+    // Proses setiap pesanan untuk memeriksa apakah ada produk agen di dalamnya
+    for (const order of allOrders.documents) {
+      const itemsInThisOrder = allOrderItems.documents.filter(item => item.orderId === order.$id);
+      const hasAgentProduct = itemsInThisOrder.some(item => agentProductIds.has(item.productId));
+
+      if (hasAgentProduct) {
+        if (order.status === 'pending') {
+          pendingOrdersCount++;
+        }
+        if (order.status === 'completed') {
+          // Hanya hitung penjualan dari item milik agen ini dalam pesanan tersebut
+          const salesFromThisOrder = itemsInThisOrder
+            .filter(item => agentProductIds.has(item.productId))
+            .reduce((sum, item) => sum + (item.priceAtPurchase * item.quantity), 0);
+          totalSales += salesFromThisOrder;
+        }
+      }
+    }
+
+    return { totalProducts, pendingOrders: pendingOrdersCount, totalSales };
+  } catch (error) {
+    console.error("Error fetching agent dashboard stats:", error);
+    return { totalProducts: 0, pendingOrders: 0, totalSales: 0 };
+  }
+}

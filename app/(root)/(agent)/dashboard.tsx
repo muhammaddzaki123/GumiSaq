@@ -1,113 +1,197 @@
 import { Href, Stack, useRouter } from 'expo-router';
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+
 import { useGlobalContext } from '../../../lib/global-provider';
+import { useAppwrite } from '@/lib/useAppwrite';
+import { getAgentDashboardStats } from '@/lib/appwrite';
+
+// Komponen Kartu Statistik
+const StatCard = ({ icon, value, label, color }: { icon: any, value: string | number, label: string, color: string }) => (
+    <View style={styles.statCard}>
+        <View style={[styles.statIconContainer, { backgroundColor: `${color}1A` }]}>
+            <Ionicons name={icon} size={24} color={color} />
+        </View>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statLabel}>{label}</Text>
+    </View>
+);
+
+// Komponen Tombol Menu
+const MenuButton = ({ title, description, route, icon, onPress }: { title: string, description: string, route: Href<any>, icon: any, onPress: (route: Href<any>) => void }) => (
+    <TouchableOpacity onPress={() => onPress(route)} style={styles.menuButton}>
+        <View style={styles.menuIconContainer}>
+            <Ionicons name={icon} size={28} color="#526346" />
+        </View>
+        <View style={styles.menuTextContainer}>
+            <Text style={styles.menuTitle}>{title}</Text>
+            <Text style={styles.menuDescription}>{description}</Text>
+        </View>
+        <Ionicons name="chevron-forward-outline" size={24} color="#CBD5E0" />
+    </TouchableOpacity>
+);
 
 export default function AgentDashboard() {
   const router = useRouter();
   const { user } = useGlobalContext();
+
+  // Ambil data statistik dasbor
+  const { data: stats, loading } = useAppwrite({
+    fn: () => getAgentDashboardStats(user!.$id),
+    skip: !user
+  });
 
   if (!user || (user.userType !== 'agent' && user.userType !== 'admin')) {
     router.replace('/');
     return null;
   }
 
-  interface MenuItem {
-    title: string;
-    description: string;
-    route: Href<any>;
-    icon: string;
-  }
-
-  const menuItems: MenuItem[] = [
-    {
-      title: 'Produk',
-      description: 'Kelola produk yang Anda jual',
-      route: '/(root)/(agent)/products' as const,
-      icon: '🏪'
-    },
-    {
-      title: 'Pesanan',
-      description: 'Lihat dan kelola pesanan masuk',
-      route: '/(root)/(agent)/orders' as const,
-      icon: '📦'
-    },
-    {
-      title: 'Laporan',
-      description: 'Lihat laporan penjualan',
-      route: '/(root)/(agent)/reports' as const,
-      icon: '📊'
-    },
-    {
-      title: 'Pengaturan Toko',
-      description: 'Atur informasi toko Anda',
-      route: '/(root)/(agent)/settings' as const,
-      icon: '⚙️'
-    }
+  const menuItems = [
+    { title: 'Produk', description: 'Tambah, edit, dan kelola produk Anda', route: '/(root)/(agent)/products' as const, icon: 'cube-outline' },
+    { title: 'Pesanan', description: 'Lihat dan proses pesanan masuk', route: '/(root)/(agent)/orders' as const, icon: 'receipt-outline' },
+    { title: 'Laporan', description: 'Analisis dan pantau penjualan', route: '/(root)/(agent)/reports' as const, icon: 'stats-chart-outline' },
+    { title: 'Pengaturan Toko', description: 'Atur profil dan informasi toko', route: '/(root)/(agent)/settings' as const, icon: 'settings-outline' }
   ];
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <SafeAreaView style={styles.container}>
       <Stack.Screen
         options={{
           headerTitle: 'Dashboard Agen',
-          headerTitleStyle: {
-            fontFamily: 'Rubik-Medium',
-          },
+          headerTitleStyle: { fontFamily: 'Rubik-Bold' },
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: '#F8F9FA' },
         }}
       />
 
-      <ScrollView className="flex-1 p-4">
-        <View className="bg-primary-300 p-6 rounded-xl mb-6">
-          <Text className="text-white font-rubik-bold text-xl mb-2">
-            Selamat datang, {user.name}!
-          </Text>
-          <Text className="text-white font-rubik opacity-90">
-            Kelola toko Anda dengan mudah
-          </Text>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContainer}
+      >
+        <View style={styles.header}>
+            <Text style={styles.headerTitle}>Selamat datang, {user.name}!</Text>
+            <Text style={styles.headerSubtitle}>Kelola toko Anda dengan mudah dari sini.</Text>
         </View>
-
-        <View className="grid grid-cols-2 gap-4">
-          {menuItems.map((item) => (
-            <TouchableOpacity
-              key={item.route}
-              onPress={() => router.push(item.route)}
-              className="bg-white p-4 rounded-xl shadow-sm border border-gray-100"
-            >
-              <Text className="text-3xl mb-3">{item.icon}</Text>
-              <Text className="font-rubik-bold text-black-300 text-lg mb-1">
-                {item.title}
-              </Text>
-              <Text className="font-rubik text-black-200 text-sm">
-                {item.description}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        
+        {/* Bagian Statistik */}
+        <View style={styles.statsContainer}>
+            {loading ? (
+                <ActivityIndicator size="small" color="#526346" />
+            ) : (
+                <>
+                    <StatCard icon="file-tray-stacked-outline" value={stats?.totalProducts ?? 0} label="Total Produk" color="#3B82F6" />
+                    <StatCard icon="time-outline" value={stats?.pendingOrders ?? 0} label="Pesanan Pending" color="#F59E0B" />
+                    <StatCard icon="cash-outline" value={`Rp ${(stats?.totalSales ?? 0).toLocaleString('id-ID')}`} label="Total Penjualan" color="#10B981" />
+                </>
+            )}
         </View>
-
-        <View className="mt-6 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-          <Text className="font-rubik-bold text-black-300 text-lg mb-4">
-            Ringkasan
-          </Text>
-          
-          <View className="space-y-3">
-            <View className="flex-row justify-between items-center">
-              <Text className="font-rubik text-black-200">Total Produk</Text>
-              <Text className="font-rubik-bold text-black-300">0</Text>
-            </View>
-            
-            <View className="flex-row justify-between items-center">
-              <Text className="font-rubik text-black-200">Pesanan Pending</Text>
-              <Text className="font-rubik-bold text-black-300">0</Text>
-            </View>
-            
-            <View className="flex-row justify-between items-center">
-              <Text className="font-rubik text-black-200">Total Penjualan</Text>
-              <Text className="font-rubik-bold text-black-300">Rp 0</Text>
-            </View>
-          </View>
+        
+        {/* Bagian Menu */}
+        <View style={styles.menuContainer}>
+            {menuItems.map((item) => (
+                <MenuButton key={item.route} {...item} onPress={(route) => router.push(route)} />
+            ))}
         </View>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: '#F8F9FA',
+    },
+    scrollContainer: {
+        paddingVertical: 16,
+        paddingHorizontal: 20,
+        paddingBottom: 40, // Memberi jarak dari tab navigasi bawah
+    },
+    header: {
+        marginBottom: 24,
+    },
+    headerTitle: {
+        fontSize: 28,
+        fontFamily: 'Rubik-Bold',
+        color: '#1F2937',
+    },
+    headerSubtitle: {
+        fontSize: 16,
+        fontFamily: 'Rubik-Regular',
+        color: '#6B7280',
+        marginTop: 4,
+    },
+    statsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        gap: 12,
+        marginBottom: 24,
+    },
+    statCard: {
+        flex: 1,
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 16,
+        alignItems: 'center',
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+    },
+    statIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    statValue: {
+        fontSize: 20,
+        fontFamily: 'Rubik-Bold',
+        color: '#1F2937',
+    },
+    statLabel: {
+        fontSize: 12,
+        fontFamily: 'Rubik-Regular',
+        color: '#6B7280',
+        marginTop: 2,
+    },
+    menuContainer: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 8,
+        elevation: 1,
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+    },
+    menuButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+    },
+    menuIconContainer: {
+        backgroundColor: '#F3F4F6',
+        borderRadius: 99,
+        padding: 12,
+        marginRight: 16,
+    },
+    menuTextContainer: {
+        flex: 1,
+    },
+    menuTitle: {
+        fontSize: 16,
+        fontFamily: 'Rubik-Medium',
+        color: '#1F2937',
+    },
+    menuDescription: {
+        fontSize: 14,
+        fontFamily: 'Rubik-Regular',
+        color: '#6B7280',
+        marginTop: 2,
+    },
+});
